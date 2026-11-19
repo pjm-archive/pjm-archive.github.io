@@ -115,42 +115,114 @@ $("#next").onclick = () => { cur.setMonth(cur.getMonth() + 1); renderCal(); };
 $("#legend").innerHTML = Object.entries(TYPES).map(([k, T]) => `<span>${mark(k)}${T.label}</span>`).join("");
 
 /* ---------- 아이템 목록 ---------- */
-let brandFilter = "";
-try { brandFilter = localStorage.getItem("pjm-brand") || ""; } catch (e) {}
-function renderBrands() {
+const store = {
+  get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+};
+let brandFilter = store.get("pjm-brand", "");
+let sortDir = store.get("pjm-sort", "desc");            // desc 최신순 · asc 오래된순
+let period = { from: "", to: "" };                        // "YYYY-MM", 빈 값은 끝 없음
+try { Object.assign(period, JSON.parse(store.get("pjm-period", "{}"))); } catch (e) {}
+
+const ym = d => d.slice(0, 7);
+const ymLabel = m => m.replace("-", ".");
+const addMonths = (m, n) => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + n, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+const thisMonth = () => `${TODAY.getFullYear()}-${pad(TODAY.getMonth() + 1)}`;
+const QUICK = {
+  all:   () => ({ from: "", to: "" }),
+  month: () => ({ from: thisMonth(), to: thisMonth() }),
+  m3:    () => ({ from: addMonths(thisMonth(), -2), to: thisMonth() }),
+  year:  () => ({ from: `${TODAY.getFullYear()}-01`, to: `${TODAY.getFullYear()}-12` })
+};
+const inPeriod = date => (!period.from || ym(date) >= period.from) && (!period.to || ym(date) <= period.to);
+function periodLabel() {
+  const { from, to } = period;
+  if (!from && !to) return "전체 기간";
+  if (from && from === to) return ymLabel(from);
+  return `${from ? ymLabel(from) : "처음"} – ${to ? ymLabel(to) : "지금"}`;
+}
+function itemIds() { return Object.keys(ITEMS).filter(id => evById[id]); }
+
+function renderPeriodPanel() {
+  const months = itemIds().map(id => ym(evById[id].date));
+  let lo = months.length ? months.reduce((a, b) => a < b ? a : b) : thisMonth();
+  let hi = [thisMonth(), ...months].reduce((a, b) => a > b ? a : b);
+  if (period.from && period.from < lo) lo = period.from;
+  if (period.to && period.to > hi) hi = period.to;
+  const opts = []; for (let m = hi; m >= lo; m = addMonths(m, -1)) opts.push(m);
+  $("#pFrom").innerHTML = `<option value="">처음부터</option>` + opts.map(m => `<option value="${m}">${ymLabel(m)}</option>`).join("");
+  $("#pTo").innerHTML = `<option value="">지금까지</option>` + opts.map(m => `<option value="${m}">${ymLabel(m)}</option>`).join("");
+  $("#pFrom").value = period.from; $("#pTo").value = period.to;
+  const active = Object.keys(QUICK).find(k => { const q = QUICK[k](); return q.from === period.from && q.to === period.to; });
+  document.querySelectorAll("#periodPanel [data-quick]").forEach(b => b.setAttribute("aria-pressed", b.dataset.quick === active));
+  $("#periodLabel").textContent = periodLabel();
+  $("#periodBtn").classList.toggle("on", !!(period.from || period.to));
+  $("#sortBtn").innerHTML = (sortDir === "desc" ? "최신순" : "오래된순") + '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10M2.5 10.5 5 13l2.5-2.5M11 13V3M8.5 5.5 11 3l2.5 2.5"/></svg>';
+}
+function setPeriod(p) {
+  if (p.from && p.to && p.from > p.to) [p.from, p.to] = [p.to, p.from];
+  period = p; store.set("pjm-period", JSON.stringify(period)); renderList();
+}
+
+function renderBrands(ids) {
   const count = {};
-  Object.entries(ITEMS).forEach(([id, list]) => {
-    if (!evById[id]) return;
-    new Set(list.map(it => it.brand).filter(Boolean)).forEach(b => count[b] = (count[b] || 0) + 1);
-  });
+  ids.forEach(id => new Set(ITEMS[id].map(it => it.brand).filter(Boolean)).forEach(b => count[b] = (count[b] || 0) + 1));
   const brands = Object.keys(count).sort((a, b) => count[b] - count[a] || a.localeCompare(b, "ko"));
-  if (brandFilter && !count[brandFilter]) brandFilter = "";
-  $("#brandBar").hidden = brands.length < 2;
-  $("#brandBar").innerHTML = [["", "전체"], ...brands.map(b => [b, b])].map(([v, label]) =>
-    `<button class="bf" data-brand="${esc(v)}" aria-pressed="${v === brandFilter}">${esc(label)}${v ? `<span>${count[v]}</span>` : ""}</button>`
+  const keep = brandFilter && !count[brandFilter] ? [[brandFilter, brandFilter, 0]] : [];   // 선택한 브랜드가 기간 밖이면 0으로 남겨둠
+  $("#brandBar").hidden = brands.length + keep.length < 2;
+  $("#brandBar").innerHTML = [["", "전체"], ...brands.map(b => [b, b, count[b]]), ...keep].map(([v, label, n]) =>
+    `<button class="bf" data-brand="${esc(v)}" aria-pressed="${v === brandFilter}">${esc(label)}${v ? `<span>${n}</span>` : ""}</button>`
   ).join("");
 }
 function renderList() {
-  renderBrands();
-  const ids = Object.keys(ITEMS).filter(id => evById[id])
+  renderPeriodPanel();
+  const inRange = itemIds().filter(id => inPeriod(evById[id].date));
+  renderBrands(inRange);
+  const ids = inRange
     .filter(id => !brandFilter || ITEMS[id].some(it => it.brand === brandFilter))
-    .sort((a, b) => evById[b].date.localeCompare(evById[a].date));
-  $("#itemList").innerHTML = ids.length ? ids.map(id => {
-    const e = evById[id], list = ITEMS[id];
+    .sort((a, b) => (sortDir === "desc" ? -1 : 1) * (evById[a].date.localeCompare(evById[b].date) || a.localeCompare(b)));
+  if (!ids.length) {
+    const any = itemIds().length;
+    $("#itemList").innerHTML = `<li class="empty">${any ? "조건에 맞는 아이템 정보가 없어요." : "아직 등록된 아이템 정보가 없어요."}${any ? ` <button class="reset" id="resetFilters">필터 초기화</button>` : ""}</li>`;
+    return;
+  }
+  let html = "", cur = "";
+  ids.forEach(id => {
+    const e = evById[id], list = ITEMS[id], m = ym(e.date);
+    if (m !== cur) {
+      cur = m;
+      const n = ids.filter(x => ym(evById[x].date) === m).length;
+      html += `<li class="mhead"><span>${ymLabel(m)}</span><small>${n}건</small></li>`;
+    }
     const brands = [...new Set(list.map(it => it.brand).filter(Boolean))];
     const sub = brandFilter
       ? `${esc(brandFilter)} ${list.filter(it => it.brand === brandFilter).length} · 전체 ${list.length}개`
       : `${brands.map(esc).join(" · ")} · ${list.length}개`;
-    return `<li><button data-id="${esc(id)}"><span class="thumb" style="display:grid;place-items:center">${mark(e.type)}</span><div class="meta"><div class="date">${fmtDate(e.date)}</div><div class="ttl">${esc(e.title)}</div><div class="cnt">${sub}</div></div><svg class="go" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button></li>`;
-  }).join("") : `<li class="empty">아직 등록된 아이템 정보가 없어요.</li>`;
+    html += `<li><button data-id="${esc(id)}"><span class="thumb" style="display:grid;place-items:center">${mark(e.type)}</span><div class="meta"><div class="date">${fmtDate(e.date)}</div><div class="ttl">${esc(e.title)}</div><div class="cnt">${sub}</div></div><svg class="go" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button></li>`;
+  });
+  $("#itemList").innerHTML = html;
 }
-$("#itemList").addEventListener("click", e => { const b = e.target.closest("button[data-id]"); if (b) openItems(b.dataset.id, null); });
+$("#itemList").addEventListener("click", e => {
+  if (e.target.closest("#resetFilters")) { brandFilter = ""; store.set("pjm-brand", ""); setPeriod({ from: "", to: "" }); return; }
+  const b = e.target.closest("button[data-id]"); if (b) openItems(b.dataset.id, null);
+});
 $("#brandBar").addEventListener("click", e => {
   const b = e.target.closest("button[data-brand]"); if (!b) return;
-  brandFilter = b.dataset.brand;
-  try { localStorage.setItem("pjm-brand", brandFilter); } catch (err) {}
-  renderList();
+  brandFilter = b.dataset.brand; store.set("pjm-brand", brandFilter); renderList();
 });
+$("#periodBtn").addEventListener("click", () => {
+  const open = $("#periodPanel").hidden;
+  $("#periodPanel").hidden = !open; $("#periodBtn").setAttribute("aria-expanded", open);
+});
+$("#periodPanel").addEventListener("click", e => {
+  const q = e.target.closest("[data-quick]"); if (q) setPeriod(QUICK[q.dataset.quick]());
+});
+$("#pFrom").addEventListener("change", () => setPeriod({ from: $("#pFrom").value, to: period.to }));
+$("#pTo").addEventListener("change", () => setPeriod({ from: period.from, to: $("#pTo").value }));
+$("#sortBtn").addEventListener("click", () => { sortDir = sortDir === "desc" ? "asc" : "desc"; store.set("pjm-sort", sortDir); renderList(); });
+// 월 헤더가 상단 고정 메뉴 바로 아래에 붙도록 메뉴 높이를 CSS 변수로
+const syncHeader = () => document.documentElement.style.setProperty("--hdr", $("header").offsetHeight + "px");
+addEventListener("resize", syncHeader); syncHeader();
 
 /* ---------- 원본 게시물 임베드 ---------- */
 const loaded = {};

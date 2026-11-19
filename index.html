@@ -127,6 +127,24 @@ main{padding-block:20px 48px}
 .status:empty{display:none}
 .embed{margin-top:14px;min-height:40px}
 .embed iframe{width:100%;max-width:100%;aspect-ratio:16/9;border:0;display:block}
+.tools{display:flex;justify-content:space-between;gap:8px;margin-bottom:10px}
+.tool{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);padding:7px 10px;font-size:12.5px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tool svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.2}
+.tool .caret{width:11px;height:11px;transition:transform .15s}
+.tool[aria-expanded="true"] .caret{transform:rotate(180deg)}
+.tool.on{border-color:var(--fg)}
+#sortBtn{font-family:var(--sans)}
+.period{border:1px solid var(--line);padding:12px;margin-bottom:12px;display:flex;flex-direction:column;gap:12px}
+.period .quick{display:flex;flex-wrap:wrap;gap:6px}
+.period .quick button{border:1px solid var(--line);padding:5px 10px;font-size:12px;color:var(--muted)}
+.period .quick button[aria-pressed="true"]{border-color:var(--fg);background:var(--fg);color:var(--bg)}
+.period .range{display:grid;grid-template-columns:auto 1fr auto auto 1fr;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.period select{min-width:0;width:100%;font:inherit;font-family:var(--mono);font-size:12.5px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:0;padding:6px 6px}
+.list .mhead{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--hdr,88px));z-index:5;background:var(--bg);display:flex;justify-content:space-between;align-items:baseline;padding-block:14px 6px;border-bottom:1px solid var(--line-strong)}
+.list .mhead span{font-family:var(--mono);font-size:15px;font-variant-numeric:tabular-nums}
+.list .mhead small{font-size:11px;color:var(--muted)}
+.list{border-top:0}
+.reset{margin-left:6px;text-decoration:underline;text-underline-offset:3px;color:var(--fg);font-size:13px}
 .brands{display:flex;gap:6px;overflow-x:auto;padding-bottom:14px;margin-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .brands::-webkit-scrollbar{display:none}
 .bf{flex:none;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);padding:6px 11px;font-size:12.5px;white-space:nowrap;color:var(--muted)}
@@ -163,6 +181,20 @@ main{padding-block:20px 48px}
   </section>
 
   <section id="view-items" hidden>
+    <div class="tools">
+      <button class="tool" id="periodBtn" aria-expanded="false" aria-controls="periodPanel"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3.5" width="11" height="10"/><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3"/></svg><span id="periodLabel">전체 기간</span><svg class="caret" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></button>
+      <button class="tool" id="sortBtn" aria-label="정렬 순서 바꾸기">최신순</button>
+    </div>
+    <div class="period" id="periodPanel" hidden>
+      <div class="quick">
+        <button data-quick="all">전체</button><button data-quick="month">이번 달</button><button data-quick="m3">최근 3개월</button><button data-quick="year">올해</button>
+      </div>
+      <div class="range">
+        <label for="pFrom">시작</label><select id="pFrom"></select>
+        <span aria-hidden="true">–</span>
+        <label for="pTo">끝</label><select id="pTo"></select>
+      </div>
+    </div>
     <div class="brands" id="brandBar" role="group" aria-label="브랜드로 보기" hidden></div>
     <ul class="list" id="itemList"></ul>
   </section>
@@ -179,6 +211,6 @@ main{padding-block:20px 48px}
     <div class="sheet-body" id="sheetBody"></div>
   </div>
 </div>
-<script src="app.js?v=20261119d"></script>
+<script src="app.js?v=20261119e"></script>
 </body>
 </html>
