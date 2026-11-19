@@ -120,7 +120,8 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 };
 let brandFilter = store.get("pjm-brand", "");
-let sortDir = store.get("pjm-sort", "desc");            // desc 최신순 · asc 오래된순
+let sortDir = store.get("pjm-sort", "desc");            // desc 최근 착용순 · asc 오래된순 · most 많이 입은 순
+if (!["desc", "asc", "most"].includes(sortDir)) sortDir = "desc";
 let period = { from: "", to: "" };                        // "YYYY-MM", 빈 값은 끝 없음
 try { Object.assign(period, JSON.parse(store.get("pjm-period", "{}"))); } catch (e) {}
 
@@ -157,7 +158,7 @@ function renderPeriodPanel() {
   document.querySelectorAll("#periodPanel [data-quick]").forEach(b => b.setAttribute("aria-pressed", b.dataset.quick === active));
   $("#periodLabel").textContent = periodLabel();
   $("#periodBtn").classList.toggle("on", !!(period.from || period.to));
-  $("#sortBtn").innerHTML = (sortDir === "desc" ? "최신순" : "오래된순") + '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10M2.5 10.5 5 13l2.5-2.5M11 13V3M8.5 5.5 11 3l2.5 2.5"/></svg>';
+  $("#sortSel").value = sortDir;
 }
 function setPeriod(p) {
   if (p.from && p.to && p.from > p.to) [p.from, p.to] = [p.to, p.from];
@@ -205,23 +206,24 @@ function renderList() {
   // 기간 안에 한 번이라도 입은 옷만, 기간 안의 마지막 착용일 기준으로
   const inRange = Object.values(GROUPS).map(g => ({ ...g, at: lastWear(g, inPeriod) })).filter(g => g.at);
   renderBrands(inRange);
+  const chrono = (a, b) => a.at.date.localeCompare(b.at.date) || a.at.id.localeCompare(b.at.id) || a.at.i - b.at.i;
   const pieces = inRange.filter(p => !brandFilter || p.it.brand === brandFilter)
-    .sort((a, b) => (sortDir === "desc" ? -1 : 1) * (a.at.date.localeCompare(b.at.date) || a.at.id.localeCompare(b.at.id) || a.at.i - b.at.i));
+    .map(p => ({ ...p, n: p.wears.filter(w => inPeriod(w.date)).length }))   // 기간 안 착용 횟수
+    .sort((a, b) => sortDir === "most" ? (b.n - a.n || chrono(b, a)) : (sortDir === "desc" ? chrono(b, a) : chrono(a, b)));
   lastListKeys = pieces.map(p => p.key);
   if (!pieces.length) {
     const any = itemIds().length;
     $("#itemList").innerHTML = `<li class="empty">${any ? "조건에 맞는 아이템 정보가 없어요." : "아직 등록된 아이템 정보가 없어요."}${any ? ` <button class="reset" id="resetFilters">필터 초기화</button>` : ""}</li>`;
     return;
   }
-  const months = [];
-  pieces.forEach(p => { const m = ym(p.at.date); if (months.at(-1)?.m !== m) months.push({ m, list: [] }); months.at(-1).list.push(p); });
-  $("#itemList").innerHTML = months.map(({ m, list }) =>
-    `<li class="mhead"><span>${ymLabel(m)}</span><small>${list.length}개</small></li><li class="pgrid">` +
-    list.map(p => `<button class="pcard" data-key="${esc(p.key)}">${thumb(p.it)}
+  // 월 구분 없이 아이템당 한 장. 날짜는 (기간 안의) 최근 착용일
+  const short = d => d.startsWith(String(TODAY.getFullYear())) ? d.slice(5).replace("-", ".") : d.slice(2).replace(/-/g, ".");   // 올해는 월.일, 지난해는 연.월.일
+  $("#itemList").innerHTML = `<li class="pcount">${pieces.length}개</li><li class="pgrid">` +
+    pieces.map(p => `<button class="pcard" data-key="${esc(p.key)}">${thumb(p.it)}
         <span class="pb">${esc(p.it.brand || "")}</span>
         <span class="pn">${esc(p.it.name)}</span>
-        <span class="pd">${p.at.date.slice(5).replace("-", ".")} · ${esc(p.it.cat)}${p.wears.length > 1 ? ` · <b>착용 ${p.wears.length}회</b>` : ""}</span>
-      </button>`).join("") + `</li>`).join("");
+        <span class="pd">${p.n > 1 ? "최근 " : ""}${short(p.at.date)} · ${esc(p.it.cat)}${p.n > 1 ? ` · <b>착용 ${p.n}회</b>` : ""}</span>
+      </button>`).join("") + `</li>`;
 }
 $("#itemList").addEventListener("click", e => {
   if (e.target.closest("#resetFilters")) { brandFilter = ""; store.set("pjm-brand", ""); setPeriod({ from: "", to: "" }); return; }
@@ -240,7 +242,7 @@ $("#periodPanel").addEventListener("click", e => {
 });
 $("#pFrom").addEventListener("change", () => setPeriod({ from: $("#pFrom").value, to: period.to }));
 $("#pTo").addEventListener("change", () => setPeriod({ from: period.from, to: $("#pTo").value }));
-$("#sortBtn").addEventListener("click", () => { sortDir = sortDir === "desc" ? "asc" : "desc"; store.set("pjm-sort", sortDir); renderList(); });
+$("#sortSel").addEventListener("change", () => { sortDir = $("#sortSel").value; store.set("pjm-sort", sortDir); renderList(); });
 // 월 헤더가 상단 고정 메뉴 바로 아래에 붙도록 메뉴 높이를 CSS 변수로
 const syncHeader = () => document.documentElement.style.setProperty("--hdr", $("header").offsetHeight + "px");
 addEventListener("resize", syncHeader); syncHeader();
@@ -299,7 +301,7 @@ const contentIds = () => EVENTS.filter(e => hasContent(e.id)).map(e => e.id).sor
 function navList(view) {
   if (view.v === "day") return Object.keys(byDate).sort();
   if (view.v === "event") return view.scope || contentIds();
-  return [...(view.scope || Object.keys(GROUPS))].filter(k => GROUPS[k]).sort(byLatest);
+  return view.scope ? view.scope.filter(k => GROUPS[k]) : Object.keys(GROUPS).sort(byLatest);
 }
 const viewKey = v => v.v === "day" ? v.date : v.v === "event" ? v.id : v.key;
 function render(view, dir = 0) {
