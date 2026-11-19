@@ -158,7 +158,10 @@ function loadScript(src) {
   return loaded[src] ??= new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.async = true; s.onload = ok; s.onerror = no; document.body.appendChild(s); });
 }
 function ytId(u) { const m = u.match(/(?:youtu\.be\/|v=|shorts\/|embed\/|live\/)([\w-]{11})/); return m && m[1]; }
-function srcBlock(s) {
+// 같은 영상이 여러 곳에 올라온 경우: 유튜브 > 인스타그램 > X 순으로 하나만 임베드하고 나머지는 링크로
+const SRC_ORDER = { youtube: 0, instagram: 1, x: 2 };
+const orderSrcs = list => [...list].sort((a, b) => (SRC_ORDER[a.platform] ?? 9) - (SRC_ORDER[b.platform] ?? 9));
+function srcBlock(s, withEmbed = true) {
   const url = safeUrl(s.url); if (!url) return "";
   const link = `<a class="src" href="${esc(url)}" target="_blank" rel="noopener">${APP_ICON[s.platform] || ""}<span class="who"><b>원본 게시물 보기</b><small>${PLATFORM_LABEL[s.platform] || ""} · ${esc(s.author)}</small></span><svg class="ext" viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a>`;
   let embed = "";
@@ -170,7 +173,7 @@ function srcBlock(s) {
   } else if (s.platform === "youtube" && ytId(url)) {
     embed = `<iframe src="https://www.youtube-nocookie.com/embed/${ytId(url)}" title="유튜브 영상" loading="lazy" allowfullscreen></iframe>`;
   }
-  return `${embed ? `<div class="embed">${embed}</div>` : ""}${link}`;
+  return `${embed && withEmbed ? `<div class="embed">${embed}</div>` : ""}${link}`;
 }
 function hydrateEmbeds() {
   const dark = matchMedia("(prefers-color-scheme: dark)").matches;
@@ -221,7 +224,7 @@ function openItems(id, fromDate) {
   $("#sheetTitle").textContent = fmtDate(e.date);
   const list = ITEMS[id] || [], srcs = SOURCES[id] || [];
   $("#sheetBody").innerHTML =
-    `<div class="item-head"><div class="type">${mark(e.type)}${TYPES[e.type].label} · 아이템 ${list.length}개</div><h3>${esc(e.title)}</h3>${srcs.map(srcBlock).join("")}</div>` +
+    `<div class="item-head"><div class="type">${mark(e.type)}${TYPES[e.type].label} · 아이템 ${list.length}개</div><h3>${esc(e.title)}</h3>${orderSrcs(srcs).map((s, i) => srcBlock(s, i === 0)).join("")}</div>` +
     list.map((it, i) => {
       const url = safeUrl(it.url);
       return `<article class="item">
