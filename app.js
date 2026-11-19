@@ -164,19 +164,28 @@ function setPeriod(p) {
   period = p; store.set("pjm-period", JSON.stringify(period)); renderList();
 }
 
-// 아이템을 하나씩 펼친 목록 (날짜순 고유 번호 포함). key = "행사ID#순번"
-function allPieces() {
-  const ids = itemIds().sort((a, b) => evById[a].date.localeCompare(evById[b].date) || a.localeCompare(b));
-  let seq = 0; const out = [];
-  ids.forEach(id => ITEMS[id].forEach((it, i) => out.push({ key: `${id}#${i}`, id, i, it, seq: ++seq })));
-  return out;
+// 같은 옷을 여러 번 입으면 하나로 묶는다. 기준: 구매 링크가 같거나, 링크가 없으면 브랜드+이름이 같을 때
+const normUrl = u => (u || "").trim().replace(/^https?:\/\/(www\.|m\.)?/i, "").replace(/[/#]+$/, "").toLowerCase();
+const groupKeyOf = it => normUrl(it.url) ? "u:" + normUrl(it.url) : "n:" + (it.brand || "").trim().toLowerCase() + "|" + (it.name || "").trim().toLowerCase();
+let GROUPS = {}, GROUP_OF = {};   // gkey → { key, it, wears:[{id,i,date}] }, "행사ID#순번" → gkey
+function buildGroups() {
+  GROUPS = {}; GROUP_OF = {};
+  itemIds().sort((a, b) => evById[a].date.localeCompare(evById[b].date) || a.localeCompare(b)).forEach(id =>
+    ITEMS[id].forEach((it, i) => {
+      const k = groupKeyOf(it);
+      const g = GROUPS[k] ??= { key: k, it: { ...it }, wears: [] };
+      g.wears.push({ id, i, date: evById[id].date });
+      g.it = { ...it, img: it.img || g.it.img };   // 가장 최근 기록의 정보를 쓰되 사진은 있는 걸로
+      GROUP_OF[`${id}#${i}`] = k;
+    }));
 }
-const pieceByKey = k => { const [id, i] = k.split("#"); return { key: k, id, i: +i, it: ITEMS[id]?.[+i] }; };
+const lastWear = (g, inRange = () => true) => g.wears.filter(w => inRange(w.date)).at(-1);
+const byLatest = (a, b) => { const x = GROUPS[a].wears.at(-1), y = GROUPS[b].wears.at(-1); return x.date.localeCompare(y.date) || x.id.localeCompare(y.id) || x.i - y.i; };
 let lastListKeys = [];   // 아이템 탭에 지금 보이는 아이템들 (상세에서 이전/다음 범위)
 
-function renderBrands(pieces) {
+function renderBrands(groups) {
   const count = {};
-  pieces.forEach(p => p.it.brand && (count[p.it.brand] = (count[p.it.brand] || 0) + 1));
+  groups.forEach(p => p.it.brand && (count[p.it.brand] = (count[p.it.brand] || 0) + 1));
   const brands = Object.keys(count).sort((a, b) => count[b] - count[a] || a.localeCompare(b, "ko"));
   const keep = brandFilter && !count[brandFilter] ? [[brandFilter, brandFilter, 0]] : [];
   $("#brandBar").hidden = brands.length + keep.length < 2;
@@ -193,10 +202,11 @@ function thumb(it, cls = "pthumb") {
 }
 function renderList() {
   renderPeriodPanel();
-  const inRange = allPieces().filter(p => inPeriod(evById[p.id].date));
+  // 기간 안에 한 번이라도 입은 옷만, 기간 안의 마지막 착용일 기준으로
+  const inRange = Object.values(GROUPS).map(g => ({ ...g, at: lastWear(g, inPeriod) })).filter(g => g.at);
   renderBrands(inRange);
   const pieces = inRange.filter(p => !brandFilter || p.it.brand === brandFilter)
-    .sort((a, b) => sortDir === "desc" ? b.seq - a.seq : a.seq - b.seq);
+    .sort((a, b) => (sortDir === "desc" ? -1 : 1) * (a.at.date.localeCompare(b.at.date) || a.at.id.localeCompare(b.at.id) || a.at.i - b.at.i));
   lastListKeys = pieces.map(p => p.key);
   if (!pieces.length) {
     const any = itemIds().length;
@@ -204,13 +214,13 @@ function renderList() {
     return;
   }
   const months = [];
-  pieces.forEach(p => { const m = ym(evById[p.id].date); if (months.at(-1)?.m !== m) months.push({ m, list: [] }); months.at(-1).list.push(p); });
+  pieces.forEach(p => { const m = ym(p.at.date); if (months.at(-1)?.m !== m) months.push({ m, list: [] }); months.at(-1).list.push(p); });
   $("#itemList").innerHTML = months.map(({ m, list }) =>
     `<li class="mhead"><span>${ymLabel(m)}</span><small>${list.length}개</small></li><li class="pgrid">` +
     list.map(p => `<button class="pcard" data-key="${esc(p.key)}">${thumb(p.it)}
         <span class="pb">${esc(p.it.brand || "")}</span>
         <span class="pn">${esc(p.it.name)}</span>
-        <span class="pd">${evById[p.id].date.slice(5).replace("-", ".")} · ${esc(p.it.cat)}</span>
+        <span class="pd">${p.at.date.slice(5).replace("-", ".")} · ${esc(p.it.cat)}${p.wears.length > 1 ? ` · <b>착용 ${p.wears.length}회</b>` : ""}</span>
       </button>`).join("") + `</li>`).join("");
 }
 $("#itemList").addEventListener("click", e => {
@@ -289,8 +299,7 @@ const contentIds = () => EVENTS.filter(e => hasContent(e.id)).map(e => e.id).sor
 function navList(view) {
   if (view.v === "day") return Object.keys(byDate).sort();
   if (view.v === "event") return view.scope || contentIds();
-  const order = Object.fromEntries(allPieces().map(p => [p.key, p.seq]));
-  return [...(view.scope || Object.keys(order))].sort((a, b) => order[a] - order[b]);
+  return [...(view.scope || Object.keys(GROUPS))].filter(k => GROUPS[k]).sort(byLatest);
 }
 const viewKey = v => v.v === "day" ? v.date : v.v === "event" ? v.id : v.key;
 function render(view, dir = 0) {
@@ -360,11 +369,12 @@ function renderEvent(id) {
     `<div class="item-head"><div class="type">${mark(e.type)}${TYPES[e.type].label}</div><h3>${esc(e.title)}</h3>${dl ? `<dl class="evmeta">${dl}</dl>` : ""}` +
     srcs.map((s, i) => srcBlock(s, i === 0)).join("") + `</div>` +
     (list.length ? `<h4 class="sec">착용 아이템 <span>${list.length}</span></h4><div class="prows">` +
-      list.map((it, i) => `<button class="prow" data-key="${esc(id)}#${i}">${thumb(it, "pthumb sm")}<span class="pt"><span class="pc">${esc(it.cat)}</span><span class="pn">${esc(it.name)}</span><span class="pb">${esc(it.brand || "")}</span></span><svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>`).join("") + `</div>` : "");
+      list.map((it, i) => `<button class="prow" data-key="${esc(GROUP_OF[`${id}#${i}`])}">${thumb(it, "pthumb sm")}<span class="pt"><span class="pc">${esc(it.cat)}</span><span class="pn">${esc(it.name)}</span><span class="pb">${esc(it.brand || "")}</span></span><svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>`).join("") + `</div>` : "");
   hydrateEmbeds();
 }
 function renderItem(key) {
-  const p = pieceByKey(key), it = p.it, e = evById[p.id];
+  const g = GROUPS[key]; if (!g) return;
+  const it = g.it, wears = [...g.wears].reverse();
   $("#sheetTitle").textContent = `${CAT_EMOJI[it.cat] || ""} ${it.cat}`;
   const url = safeUrl(it.url);
   $("#sheetBody").innerHTML =
@@ -372,8 +382,8 @@ function renderItem(key) {
       <p class="pb">${esc(it.brand || "")}</p>
       <h3 class="pn">${esc(it.name)}</h3>
       ${url ? `<a class="buy" href="${esc(url)}" target="_blank" rel="noopener">구매 링크<svg viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a><p class="hint-s">판매가 끝났거나 페이지가 바뀌면 링크가 동작하지 않을 수 있어요.</p>` : `<div class="empty">구매 링크 정보 없음</div>`}
-      <h4 class="sec">착용 일정</h4>
-      <button class="prow evlink" data-ev="${esc(p.id)}"><span class="evicon">${mark(e.type)}</span><span class="pt"><span class="pc">${fmtDate(e.date)}</span><span class="pn">${esc(e.title)}</span></span><svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>
+      <h4 class="sec">착용 일정 <span>${wears.length}</span></h4>
+      ${wears.map(w => { const e = evById[w.id]; return `<button class="prow evlink" data-ev="${esc(w.id)}"><span class="evicon">${mark(e.type)}</span><span class="pt"><span class="pc">${fmtDate(e.date)}</span><span class="pn">${esc(e.title)}</span></span><svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>`; }).join("")}
     </div>`;
 }
 $("#sheetBody").addEventListener("click", ev => {
@@ -470,7 +480,7 @@ async function boot() {
       cur = new Date(+past.slice(0, 4), +past.slice(5, 7) - 1, 1);
     }
     $("#status").textContent = "";
-    renderCal(); renderList();
+    buildGroups(); renderCal(); renderList();
   } catch (err) {
     $("#status").textContent = "일정 데이터를 불러오지 못했어요. 잠시 후 새로고침해 주세요.";
   }
