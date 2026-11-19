@@ -10,11 +10,12 @@ const TYPES = {
   muin:      { label: "무대인사",  chip: "무인",   cls: "muin" },
   book:      { label: "북토크",   chip: "북토크", cls: "book" },
   tv:        { label: "방송",     chip: "방송",   cls: "tv" },
-  concert:   { label: "콘서트",   chip: "콘서트", cls: "etc" }
+  concert:   { label: "콘서트",   chip: "콘서트", cls: "etc" },
+  fancafe:   { label: "팬카페",   kind: "app" }
 };
-const TYPE_BY_LABEL = { "유튜브":"youtube", "인스타그램":"instagram", "GV":"gv", "무대인사":"muin", "북토크":"book", "방송":"tv", "콘서트":"concert" };
-const PLATFORM_BY_LABEL = { "X":"x", "인스타그램":"instagram", "유튜브":"youtube" };
-const PLATFORM_LABEL = { x:"X", instagram:"인스타그램", youtube:"유튜브" };
+const TYPE_BY_LABEL = { "유튜브":"youtube", "인스타그램":"instagram", "GV":"gv", "무대인사":"muin", "북토크":"book", "방송":"tv", "콘서트":"concert", "팬카페":"fancafe" };
+const PLATFORM_BY_LABEL = { "X":"x", "인스타그램":"instagram", "유튜브":"youtube", "네이버 카페":"cafe" };
+const PLATFORM_LABEL = { x:"X", instagram:"인스타그램", youtube:"유튜브", cafe:"네이버 카페" };
 const CAT_EMOJI = { "아우터":"🧥", "상의":"👕", "하의":"👖", "신발":"👟", "잡화":"👜", "기타":"✨" };
 
 const APP_ICON = {
@@ -22,6 +23,7 @@ const APP_ICON = {
   instagram: '<svg class="app" viewBox="0 0 18 18" aria-label="인스타그램"><defs><linearGradient id="ig" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#f6a13a"/><stop offset=".5" stop-color="#e2336b"/><stop offset="1" stop-color="#7a3fc4"/></linearGradient></defs><rect x="1.5" y="1.5" width="15" height="15" rx="4.2" fill="url(#ig)"/><circle cx="9" cy="9" r="3.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="13" cy="5" r=".9" fill="#fff"/></svg>',
   x: '<svg class="app" viewBox="0 0 18 18" aria-label="X"><rect x="1.5" y="1.5" width="15" height="15" rx="3.5" fill="#000"/><path d="M5.2 5h2.3l5.3 8H10.5zM12.6 5 5.4 13" stroke="#fff" stroke-width="1.1" fill="none"/></svg>'
 };
+APP_ICON.fancafe = APP_ICON.cafe = '<svg class="app" viewBox="0 0 18 18" aria-label="네이버 카페"><rect x="1.5" y="1.5" width="15" height="15" rx="4" fill="#03c75a"/><path d="M5.5 6.5h6v3.2a3 3 0 0 1-3 3h0a3 3 0 0 1-3-3zM11.5 7.3h.7a1.3 1.3 0 0 1 0 2.6h-.9" stroke="#fff" stroke-width="1.2" fill="none"/></svg>';
 const mark = t => { const T = TYPES[t]; return T.kind === "app" ? APP_ICON[t] : `<span class="chip ${T.cls}">${T.chip}</span>`; };
 
 /* ---------- 유틸 ---------- */
@@ -154,7 +156,7 @@ function srcBlock(s) {
   } else if (s.platform === "youtube" && ytId(url)) {
     embed = `<iframe src="https://www.youtube-nocookie.com/embed/${ytId(url)}" title="유튜브 영상" loading="lazy" allowfullscreen></iframe>`;
   }
-  return `<div class="embed">${embed}</div>${link}`;
+  return `${embed ? `<div class="embed">${embed}</div>` : ""}${link}`;
 }
 function hydrateEmbeds() {
   const dark = matchMedia("(prefers-color-scheme: dark)").matches;
