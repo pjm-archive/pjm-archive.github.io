@@ -26,6 +26,14 @@ const APP_ICON = {
 };
 APP_ICON.fancafe = APP_ICON.cafe = '<svg class="app" viewBox="0 0 18 18" aria-label="네이버 카페"><rect x="1.5" y="1.5" width="15" height="15" rx="4" fill="#03c75a"/><path d="M5.5 6.5h6v3.2a3 3 0 0 1-3 3h0a3 3 0 0 1-3-3zM11.5 7.3h.7a1.3 1.3 0 0 1 0 2.6h-.9" stroke="#fff" stroke-width="1.2" fill="none"/></svg>';
 APP_ICON.blog = '<svg class="app" viewBox="0 0 18 18" aria-label="네이버 블로그"><rect x="1.5" y="1.5" width="15" height="15" rx="4" fill="#03c75a"/><path d="M6.2 4.8v8.4M6.2 9.6a2.6 2.6 0 1 1 0 .01" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>';
+// 사이트가 모르는 종류가 시트에 들어와도 일정이 사라지지 않게 회색 글자 칩으로 표시
+function typeKey(label) {
+  if (!label) return "";
+  if (TYPE_BY_LABEL[label]) return TYPE_BY_LABEL[label];
+  const k = "x-" + label;
+  TYPES[k] ??= { label, chip: label, cls: "etc" };
+  return k;
+}
 const mark = t => { const T = TYPES[t]; return T.kind === "app" ? APP_ICON[t] : `<span class="chip ${T.cls}">${T.chip}</span>`; };
 
 /* ---------- 유틸 ---------- */
@@ -237,7 +245,7 @@ async function boot() {
   try {
     const [ev, it, sr] = await Promise.all([loadTab("일정"), loadTab("아이템"), loadTab("출처")]);
     EVENTS = ev.map(r => ({
-      id: r["행사ID"], date: r["날짜"], type: TYPE_BY_LABEL[r["종류"]],
+      id: r["행사ID"], date: r["날짜"], type: typeKey(r["종류"]),
       title: r["행사명"], place: r["장소"], desc: r["설명"]
     })).filter(e => e.id && /^\d{4}-\d{2}-\d{2}$/.test(e.date) && e.type && e.title);
     evById = Object.fromEntries(EVENTS.map(e => [e.id, e]));
