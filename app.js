@@ -406,6 +406,45 @@ $("#sheetBody").addEventListener("touchend", e => {
   if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
 }, { passive: true });
 
+/* ---------- 제목: 일정 탭 이번 달로 ---------- */
+$("#homeLink").addEventListener("click", e => {
+  e.preventDefault();
+  if (stack.length) closeAll();
+  $("#tab-cal").click();
+  cur = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1); renderCal();
+  scrollTo({ top: 0, behavior: "smooth" });
+});
+
+/* ---------- 이용 안내 팝업 ---------- */
+const gTrack = $("#gTrack"), gN = gTrack.children.length;
+const gIndex = () => Math.round(gTrack.scrollLeft / gTrack.clientWidth);
+function gSync() {
+  const i = gIndex();
+  $("#gPos").textContent = `${i + 1} / ${gN}`;
+  [...$("#gDots").children].forEach((d, k) => d.classList.toggle("on", k === i));
+  $("#gPrev").disabled = i <= 0; $("#gNext").disabled = i >= gN - 1;
+}
+function openGuide() {
+  $("#guide").hidden = false; document.body.style.overflow = "hidden";
+  gTrack.scrollLeft = 0; gSync();
+  history.pushState({ guide: 1 }, "");
+  setTimeout(() => $("#gClose").focus(), 30);
+}
+function hideGuide() { $("#guide").hidden = true; document.body.style.overflow = ""; $("#guideBtn").focus(); }
+$("#guideBtn").onclick = openGuide;
+$("#gClose").onclick = () => history.back();
+$("#guide").addEventListener("click", e => { if (e.target.id === "guide") history.back(); });
+addEventListener("popstate", e => { if (!$("#guide").hidden && !e.state?.guide) hideGuide(); });
+gTrack.addEventListener("scroll", () => requestAnimationFrame(gSync), { passive: true });
+$("#gPrev").onclick = () => gTrack.scrollBy({ left: -gTrack.clientWidth, behavior: "smooth" });
+$("#gNext").onclick = () => gTrack.scrollBy({ left: gTrack.clientWidth, behavior: "smooth" });
+document.addEventListener("keydown", e => {
+  if ($("#guide").hidden) return;
+  if (e.key === "Escape") history.back();
+  else if (e.key === "ArrowLeft") $("#gPrev").click();
+  else if (e.key === "ArrowRight") $("#gNext").click();
+});
+
 /* ---------- 부팅 ---------- */
 async function boot() {
   renderCal(); renderList();
