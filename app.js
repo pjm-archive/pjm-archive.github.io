@@ -186,7 +186,8 @@ function renderBrands(pieces) {
 }
 // 상품 사진. 없거나 못 불러오면 카테고리 아이콘 칸으로
 function thumb(it, cls = "pthumb") {
-  const src = safeUrl(it.img);
+  // 외부 주소(http) 또는 저장소에 올린 파일(images/items/...)
+  const src = /^images\/items\/[\w.-]+$/.test(it.img || "") ? it.img : safeUrl(it.img);
   const fb = `<span class="fb">${CAT_EMOJI[it.cat] || "✨"}</span>`;
   return `<span class="${cls}${src ? "" : " none"}">${src ? `<img src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}${fb}</span>`;
 }
