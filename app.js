@@ -97,8 +97,12 @@ function renderCal() {
     const d = new Date(start); d.setDate(start.getDate() + i);
     const k = ymd(d), evs = byDate[k] || [], out = d.getMonth() !== cur.getMonth();
     const cls = ["day", out && "out", k === ymd(TODAY) && "today", evs.length && "has"].filter(Boolean).join(" ");
-    const shown = evs.slice(0, 3).map(e => mark(e.type)).join("");
-    const more = evs.length > 3 ? `<span class="more">+${evs.length - 3}</span>` : "";
+    // 같은 종류는 아이콘 하나 + 개수로 묶기
+    const groups = [];
+    evs.forEach(e => { const g = groups.find(x => x.type === e.type); g ? g.n++ : groups.push({ type: e.type, n: 1 }); });
+    const shown = groups.slice(0, 3).map(g => `<span class="mk">${mark(g.type)}${g.n > 1 ? `<b>${g.n}</b>` : ""}</span>`).join("");
+    const rest = groups.slice(3).reduce((s, g) => s + g.n, 0);
+    const more = rest ? `<span class="more">+${rest}</span>` : "";
     html += evs.length
       ? `<button class="${cls}" data-date="${k}" aria-label="${fmtDate(k)} 일정 ${evs.length}건"><span class="n">${d.getDate()}</span><span class="marks">${shown}${more}</span></button>`
       : `<div class="${cls}"><span class="n">${d.getDate()}</span></div>`;
