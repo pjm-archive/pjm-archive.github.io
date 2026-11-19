@@ -99,15 +99,42 @@ $("#next").onclick = () => { cur.setMonth(cur.getMonth() + 1); renderCal(); };
 $("#legend").innerHTML = Object.entries(TYPES).map(([k, T]) => `<span>${mark(k)}${T.label}</span>`).join("");
 
 /* ---------- 아이템 목록 ---------- */
+let brandFilter = "";
+try { brandFilter = localStorage.getItem("pjm-brand") || ""; } catch (e) {}
+function renderBrands() {
+  const count = {};
+  Object.entries(ITEMS).forEach(([id, list]) => {
+    if (!evById[id]) return;
+    new Set(list.map(it => it.brand).filter(Boolean)).forEach(b => count[b] = (count[b] || 0) + 1);
+  });
+  const brands = Object.keys(count).sort((a, b) => count[b] - count[a] || a.localeCompare(b, "ko"));
+  if (brandFilter && !count[brandFilter]) brandFilter = "";
+  $("#brandBar").hidden = brands.length < 2;
+  $("#brandBar").innerHTML = [["", "전체"], ...brands.map(b => [b, b])].map(([v, label]) =>
+    `<button class="bf" data-brand="${esc(v)}" aria-pressed="${v === brandFilter}">${esc(label)}${v ? `<span>${count[v]}</span>` : ""}</button>`
+  ).join("");
+}
 function renderList() {
+  renderBrands();
   const ids = Object.keys(ITEMS).filter(id => evById[id])
+    .filter(id => !brandFilter || ITEMS[id].some(it => it.brand === brandFilter))
     .sort((a, b) => evById[b].date.localeCompare(evById[a].date));
   $("#itemList").innerHTML = ids.length ? ids.map(id => {
-    const e = evById[id], n = ITEMS[id].length;
-    return `<li><button data-id="${esc(id)}"><span class="thumb" style="display:grid;place-items:center">${mark(e.type)}</span><div class="meta"><div class="date">${fmtDate(e.date)}</div><div class="ttl">${esc(e.title)}</div><div class="cnt">아이템 ${n}개</div></div><svg class="go" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button></li>`;
+    const e = evById[id], list = ITEMS[id];
+    const brands = [...new Set(list.map(it => it.brand).filter(Boolean))];
+    const sub = brandFilter
+      ? `${esc(brandFilter)} ${list.filter(it => it.brand === brandFilter).length} · 전체 ${list.length}개`
+      : `${brands.map(esc).join(" · ")} · ${list.length}개`;
+    return `<li><button data-id="${esc(id)}"><span class="thumb" style="display:grid;place-items:center">${mark(e.type)}</span><div class="meta"><div class="date">${fmtDate(e.date)}</div><div class="ttl">${esc(e.title)}</div><div class="cnt">${sub}</div></div><svg class="go" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button></li>`;
   }).join("") : `<li class="empty">아직 등록된 아이템 정보가 없어요.</li>`;
 }
 $("#itemList").addEventListener("click", e => { const b = e.target.closest("button[data-id]"); if (b) openItems(b.dataset.id, null); });
+$("#brandBar").addEventListener("click", e => {
+  const b = e.target.closest("button[data-brand]"); if (!b) return;
+  brandFilter = b.dataset.brand;
+  try { localStorage.setItem("pjm-brand", brandFilter); } catch (err) {}
+  renderList();
+});
 
 /* ---------- 원본 게시물 임베드 ---------- */
 const loaded = {};

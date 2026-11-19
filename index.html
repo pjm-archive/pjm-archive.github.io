@@ -125,6 +125,11 @@ main{padding-block:20px 48px}
 .status:empty{display:none}
 .embed{margin-top:14px;min-height:40px}
 .embed iframe{width:100%;max-width:100%;aspect-ratio:16/9;border:0;display:block}
+.brands{display:flex;gap:6px;overflow-x:auto;padding-bottom:14px;margin-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.brands::-webkit-scrollbar{display:none}
+.bf{flex:none;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);padding:6px 11px;font-size:12.5px;white-space:nowrap;color:var(--muted)}
+.bf span{font-family:var(--mono);font-size:10px;font-variant-numeric:tabular-nums}
+.bf[aria-pressed="true"]{border-color:var(--fg);background:var(--fg);color:var(--bg)}
 .empty{color:var(--muted);font-size:13px;padding-block:20px}
 </style>
 </head>
@@ -156,6 +161,7 @@ main{padding-block:20px 48px}
   </section>
 
   <section id="view-items" hidden>
+    <div class="brands" id="brandBar" role="group" aria-label="브랜드로 보기" hidden></div>
     <ul class="list" id="itemList"></ul>
   </section>
 </main>
