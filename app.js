@@ -142,7 +142,6 @@ function periodLabel() {
   return `${from ? ymLabel(from) : "처음"} – ${to ? ymLabel(to) : "지금"}`;
 }
 function itemIds() { return Object.keys(ITEMS).filter(id => evById[id]); }
-let lastListIds = null;   // 목록에 지금 보이는 행사들 (팝업 이전/다음 범위)
 
 function renderPeriodPanel() {
   const months = itemIds().map(id => ym(evById[id].date));
@@ -165,48 +164,57 @@ function setPeriod(p) {
   period = p; store.set("pjm-period", JSON.stringify(period)); renderList();
 }
 
-function renderBrands(ids) {
+// 아이템을 하나씩 펼친 목록 (날짜순 고유 번호 포함). key = "행사ID#순번"
+function allPieces() {
+  const ids = itemIds().sort((a, b) => evById[a].date.localeCompare(evById[b].date) || a.localeCompare(b));
+  let seq = 0; const out = [];
+  ids.forEach(id => ITEMS[id].forEach((it, i) => out.push({ key: `${id}#${i}`, id, i, it, seq: ++seq })));
+  return out;
+}
+const pieceByKey = k => { const [id, i] = k.split("#"); return { key: k, id, i: +i, it: ITEMS[id]?.[+i] }; };
+let lastListKeys = [];   // 아이템 탭에 지금 보이는 아이템들 (상세에서 이전/다음 범위)
+
+function renderBrands(pieces) {
   const count = {};
-  ids.forEach(id => new Set(ITEMS[id].map(it => it.brand).filter(Boolean)).forEach(b => count[b] = (count[b] || 0) + 1));
+  pieces.forEach(p => p.it.brand && (count[p.it.brand] = (count[p.it.brand] || 0) + 1));
   const brands = Object.keys(count).sort((a, b) => count[b] - count[a] || a.localeCompare(b, "ko"));
-  const keep = brandFilter && !count[brandFilter] ? [[brandFilter, brandFilter, 0]] : [];   // 선택한 브랜드가 기간 밖이면 0으로 남겨둠
+  const keep = brandFilter && !count[brandFilter] ? [[brandFilter, brandFilter, 0]] : [];
   $("#brandBar").hidden = brands.length + keep.length < 2;
   $("#brandBar").innerHTML = [["", "전체"], ...brands.map(b => [b, b, count[b]]), ...keep].map(([v, label, n]) =>
     `<button class="bf" data-brand="${esc(v)}" aria-pressed="${v === brandFilter}">${esc(label)}${v ? `<span>${n}</span>` : ""}</button>`
   ).join("");
 }
+// 상품 사진. 없거나 못 불러오면 카테고리 아이콘 칸으로
+function thumb(it, cls = "pthumb") {
+  const src = safeUrl(it.img);
+  const fb = `<span class="fb">${CAT_EMOJI[it.cat] || "✨"}</span>`;
+  return `<span class="${cls}${src ? "" : " none"}">${src ? `<img src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}${fb}</span>`;
+}
 function renderList() {
   renderPeriodPanel();
-  const inRange = itemIds().filter(id => inPeriod(evById[id].date));
+  const inRange = allPieces().filter(p => inPeriod(evById[p.id].date));
   renderBrands(inRange);
-  const ids = inRange
-    .filter(id => !brandFilter || ITEMS[id].some(it => it.brand === brandFilter))
-    .sort((a, b) => (sortDir === "desc" ? -1 : 1) * (evById[a].date.localeCompare(evById[b].date) || a.localeCompare(b)));
-  lastListIds = ids;
-  if (!ids.length) {
+  const pieces = inRange.filter(p => !brandFilter || p.it.brand === brandFilter)
+    .sort((a, b) => sortDir === "desc" ? b.seq - a.seq : a.seq - b.seq);
+  lastListKeys = pieces.map(p => p.key);
+  if (!pieces.length) {
     const any = itemIds().length;
     $("#itemList").innerHTML = `<li class="empty">${any ? "조건에 맞는 아이템 정보가 없어요." : "아직 등록된 아이템 정보가 없어요."}${any ? ` <button class="reset" id="resetFilters">필터 초기화</button>` : ""}</li>`;
     return;
   }
-  let html = "", cur = "";
-  ids.forEach(id => {
-    const e = evById[id], list = ITEMS[id], m = ym(e.date);
-    if (m !== cur) {
-      cur = m;
-      const n = ids.filter(x => ym(evById[x].date) === m).length;
-      html += `<li class="mhead"><span>${ymLabel(m)}</span><small>${n}건</small></li>`;
-    }
-    const brands = [...new Set(list.map(it => it.brand).filter(Boolean))];
-    const sub = brandFilter
-      ? `${esc(brandFilter)} ${list.filter(it => it.brand === brandFilter).length} · 전체 ${list.length}개`
-      : `${brands.map(esc).join(" · ")} · ${list.length}개`;
-    html += `<li><button data-id="${esc(id)}"><span class="thumb" style="display:grid;place-items:center">${mark(e.type)}</span><div class="meta"><div class="date">${fmtDate(e.date)}</div><div class="ttl">${esc(e.title)}</div><div class="cnt">${sub}</div></div><svg class="go" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button></li>`;
-  });
-  $("#itemList").innerHTML = html;
+  const months = [];
+  pieces.forEach(p => { const m = ym(evById[p.id].date); if (months.at(-1)?.m !== m) months.push({ m, list: [] }); months.at(-1).list.push(p); });
+  $("#itemList").innerHTML = months.map(({ m, list }) =>
+    `<li class="mhead"><span>${ymLabel(m)}</span><small>${list.length}개</small></li><li class="pgrid">` +
+    list.map(p => `<button class="pcard" data-key="${esc(p.key)}">${thumb(p.it)}
+        <span class="pb">${esc(p.it.brand || "")}</span>
+        <span class="pn">${esc(p.it.name)}</span>
+        <span class="pd">${evById[p.id].date.slice(5).replace("-", ".")} · ${esc(p.it.cat)}</span>
+      </button>`).join("") + `</li>`).join("");
 }
 $("#itemList").addEventListener("click", e => {
   if (e.target.closest("#resetFilters")) { brandFilter = ""; store.set("pjm-brand", ""); setPeriod({ from: "", to: "" }); return; }
-  const b = e.target.closest("button[data-id]"); if (b) openItems(b.dataset.id, null);
+  const b = e.target.closest("button[data-key]"); if (b) openItem(b.dataset.key, lastListKeys);
 });
 $("#brandBar").addEventListener("click", e => {
   const b = e.target.closest("button[data-brand]"); if (!b) return;
@@ -257,8 +265,8 @@ function hydrateEmbeds() {
 }
 
 /* ---------- 시트(팝업) ---------- */
-// 화면 스택: 날짜 상세 → (아이템) 순서로 쌓이고, 브라우저 뒤로가기와 연동된다.
-// 이전/다음은 항상 날짜순(‹ 이전 날짜, › 다음 날짜)으로 이동하고 스택 깊이는 그대로 둔다.
+// 화면: 날짜(day) → 일정 상세(event) → 아이템 상세(item). 스택으로 쌓이고 브라우저 뒤로가기와 연동.
+// 이전/다음은 항상 날짜순(‹ 이전, › 다음)으로 이동하고 스택 깊이는 그대로 둔다.
 let stack = [], lastFocus = null;
 function showSheet() {
   if (!$("#sheet").hidden) return;
@@ -274,17 +282,24 @@ function hideSheet() {
   setTimeout(() => { $("#scrim").hidden = true; $("#sheet").hidden = true; lastFocus && lastFocus.focus(); }, 250);
 }
 const byDateId = (a, b) => evById[a].date.localeCompare(evById[b].date) || a.localeCompare(b);
+const hasContent = id => !!(SOURCES[id]?.length || ITEMS[id]?.length);   // 볼 게 있는 일정만 상세 카드로
+const contentIds = () => EVENTS.filter(e => hasContent(e.id)).map(e => e.id).sort(byDateId);
 function navList(view) {
-  return view.v === "day" ? Object.keys(byDate).sort() : [...(view.scope || itemIds())].sort(byDateId);
+  if (view.v === "day") return Object.keys(byDate).sort();
+  if (view.v === "event") return view.scope || contentIds();
+  const order = Object.fromEntries(allPieces().map(p => [p.key, p.seq]));
+  return [...(view.scope || Object.keys(order))].sort((a, b) => order[a] - order[b]);
 }
-const viewKey = v => v.v === "day" ? v.date : v.id;
+const viewKey = v => v.v === "day" ? v.date : v.v === "event" ? v.id : v.key;
 function render(view, dir = 0) {
   const list = navList(view), i = list.indexOf(viewKey(view));
   $("#prevS").disabled = i <= 0;
   $("#nextS").disabled = i < 0 || i >= list.length - 1;
   $("#sheetPos").textContent = i >= 0 && list.length > 1 ? `${i + 1} / ${list.length}` : "";
   $("#back").style.visibility = stack.length < 2 ? "hidden" : "visible";   // 자리는 유지해서 제목이 가운데 오게
-  view.v === "day" ? renderDay(view.date) : renderItems(view.id);
+  if (view.v === "day") renderDay(view.date);
+  else if (view.v === "event") renderEvent(view.id);
+  else renderItem(view.key);
   const body = $("#sheetBody");
   body.scrollTop = 0;
   body.classList.remove("in-l", "in-r");
@@ -299,15 +314,16 @@ function go(dir) {
   const view = stack[stack.length - 1]; if (!view) return;
   const list = navList(view), j = list.indexOf(viewKey(view)) + dir;
   if (j < 0 || j >= list.length) return;
-  const next = view.v === "day" ? { ...view, date: list[j] } : { ...view, id: list[j] };
+  const next = view.v === "day" ? { ...view, date: list[j] } : view.v === "event" ? { ...view, id: list[j] } : { ...view, key: list[j] };
   stack[stack.length - 1] = next;
   render(next, dir);
   if (next.v === "day") { const d = next.date; const m = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, 1); if (m.getTime() !== cur.getTime()) { cur = m; renderCal(); } }
 }
 function openDay(date) { stack = []; push({ v: "day", date }); }
-function openItems(id, fromDate) {
-  if (fromDate) push({ v: "items", id });                         // 날짜 상세에서 들어옴: 전체 아이템을 날짜순으로
-  else { stack = []; push({ v: "items", id, scope: lastListIds }); } // 목록에서 들어옴: 지금 걸린 필터 결과 안에서
+function openEvent(id) { push({ v: "event", id }); }
+function openItem(key, scope) {
+  if (scope) { stack = []; push({ v: "item", key, scope }); }   // 아이템 탭에서: 지금 걸린 필터 결과 안에서 넘기기
+  else push({ v: "item", key });                                 // 일정 상세에서: 전체 아이템을 날짜순으로
 }
 function closeAll() { if (stack.length) history.go(-stack.length); }
 addEventListener("popstate", e => {
@@ -317,44 +333,57 @@ addEventListener("popstate", e => {
   if (!d) hideSheet(); else render(stack[d - 1]);
 });
 
+const SRC_HINT = { youtube: "영상", instagram: "게시물", x: "게시물", cafe: "카페 글", blog: "블로그 글" };
 function renderDay(date) {
   $("#sheetTitle").textContent = fmtDate(date);
   $("#sheetBody").innerHTML = (byDate[date] || []).map(e => {
-    const has = !!ITEMS[e.id];
-    const title = has
-      ? `<button data-items="${esc(e.id)}">${esc(e.title)}<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>`
+    const n = ITEMS[e.id]?.length || 0, srcs = orderSrcs(SOURCES[e.id] || []);
+    const title = hasContent(e.id)
+      ? `<button data-ev="${esc(e.id)}">${esc(e.title)}<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>`
       : esc(e.title);
     let dl = "";
     if (e.place) dl += `<dt>장소</dt><dd>${esc(e.place)}</dd>`;
     if (e.desc) dl += `<dt>설명</dt><dd>${esc(e.desc)}</dd>`;
-    // 아이템이 없는 일정은 원본 링크를 상세에 바로 노출
-    const links = has ? "" : (SOURCES[e.id] || []).map(s => {
-      const url = safeUrl(s.url); if (!url) return "";
-      return `<a class="src" href="${esc(url)}" target="_blank" rel="noopener">${APP_ICON[s.platform] || ""}<span class="who"><b>원본 게시물 보기</b><small>${PLATFORM_LABEL[s.platform] || ""}${s.author ? " · " + esc(s.author) : ""}</small></span><svg class="ext" viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a>`;
-    }).join("");
-    return `<article class="ev"><div class="type">${mark(e.type)}${TYPES[e.type].label}</div><h3>${title}</h3>${dl ? `<dl>${dl}</dl>` : ""}${links}</article>`;
+    const hints = [srcs.length ? `<span>${SRC_HINT[srcs[0].platform] || "원본"}</span>` : "", n ? `<span class="on">아이템 ${n}</span>` : ""].join("");
+    return `<article class="ev"><div class="type">${mark(e.type)}${TYPES[e.type].label}</div><h3>${title}</h3>${dl ? `<dl>${dl}</dl>` : ""}${hints.trim() ? `<div class="hints">${hints}</div>` : ""}</article>`;
   }).join("");
 }
-function renderItems(id) {
-  const e = evById[id];
+function renderEvent(id) {
+  const e = evById[id], list = ITEMS[id] || [], srcs = orderSrcs(SOURCES[id] || []);
   $("#sheetTitle").textContent = fmtDate(e.date);
-  const list = ITEMS[id] || [], srcs = SOURCES[id] || [];
+  let dl = "";
+  if (e.place) dl += `<dt>장소</dt><dd>${esc(e.place)}</dd>`;
+  if (e.desc) dl += `<dt>설명</dt><dd>${esc(e.desc)}</dd>`;
   $("#sheetBody").innerHTML =
-    `<div class="item-head"><div class="type">${mark(e.type)}${TYPES[e.type].label} · 아이템 ${list.length}개</div><h3>${esc(e.title)}</h3>${orderSrcs(srcs).map((s, i) => srcBlock(s, i === 0)).join("")}</div>` +
-    list.map((it, i) => {
-      const url = safeUrl(it.url);
-      return `<article class="item">
-        <div class="row"><span class="cat">${CAT_EMOJI[it.cat] || ""} ${esc(it.cat)}</span><span class="idx">${pad(i + 1)} / ${pad(list.length)}</span></div>
-        <div><p class="name">${esc(it.name)}</p><p class="brandname">${esc(it.brand)}</p></div>
-        ${url ? `<a class="buy" href="${esc(url)}" target="_blank" rel="noopener">구매 링크<svg viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a>` : `<div class="empty">구매 링크 정보 없음</div>`}
-      </article>`;
-    }).join("");
+    `<div class="item-head"><div class="type">${mark(e.type)}${TYPES[e.type].label}</div><h3>${esc(e.title)}</h3>${dl ? `<dl class="evmeta">${dl}</dl>` : ""}` +
+    srcs.map((s, i) => srcBlock(s, i === 0)).join("") + `</div>` +
+    (list.length ? `<h4 class="sec">착용 아이템 <span>${list.length}</span></h4><div class="prows">` +
+      list.map((it, i) => `<button class="prow" data-key="${esc(id)}#${i}">${thumb(it, "pthumb sm")}<span class="pt"><span class="pc">${esc(it.cat)}</span><span class="pn">${esc(it.name)}</span><span class="pb">${esc(it.brand || "")}</span></span><svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>`).join("") + `</div>` : "");
   hydrateEmbeds();
 }
+function renderItem(key) {
+  const p = pieceByKey(key), it = p.it, e = evById[p.id];
+  $("#sheetTitle").textContent = `${CAT_EMOJI[it.cat] || ""} ${it.cat}`;
+  const url = safeUrl(it.url);
+  $("#sheetBody").innerHTML =
+    `<div class="pdetail">${thumb(it, "pthumb lg")}
+      <p class="pb">${esc(it.brand || "")}</p>
+      <h3 class="pn">${esc(it.name)}</h3>
+      ${url ? `<a class="buy" href="${esc(url)}" target="_blank" rel="noopener">구매 링크<svg viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a><p class="hint-s">판매가 끝났거나 페이지가 바뀌면 링크가 동작하지 않을 수 있어요.</p>` : `<div class="empty">구매 링크 정보 없음</div>`}
+      <h4 class="sec">착용 일정</h4>
+      <button class="prow evlink" data-ev="${esc(p.id)}"><span class="evicon">${mark(e.type)}</span><span class="pt"><span class="pc">${fmtDate(e.date)}</span><span class="pn">${esc(e.title)}</span></span><svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>
+    </div>`;
+}
 $("#sheetBody").addEventListener("click", ev => {
-  const b = ev.target.closest("button[data-items]");
-  if (b) { const id = b.dataset.items; openItems(id, evById[id].date); }
+  const e = ev.target.closest("button[data-ev]"); if (e) return openEvent(e.dataset.ev);
+  const k = ev.target.closest("button[data-key]"); if (k) return openItem(k.dataset.key);
 });
+// 상품 사진을 못 불러오면 대체 칸으로
+document.addEventListener("error", e => {
+  if (e.target.tagName === "IMG" && e.target.parentElement?.classList.contains("pthumb")) {
+    e.target.parentElement.classList.add("none"); e.target.remove();
+  }
+}, true);
 $("#back").onclick = () => history.back();
 $("#close").onclick = closeAll;
 $("#scrim").onclick = closeAll;
@@ -389,7 +418,7 @@ async function boot() {
     byDate = {}; EVENTS.forEach(e => (byDate[e.date] ??= []).push(e));
     ITEMS = {};
     it.filter(r => evById[r["행사ID"]]).sort((a, b) => (+a["순서"] || 0) - (+b["순서"] || 0))
-      .forEach(r => (ITEMS[r["행사ID"]] ??= []).push({ cat: r["카테고리"], name: r["아이템명"], brand: r["브랜드"], url: r["구매링크"] }));
+      .forEach(r => (ITEMS[r["행사ID"]] ??= []).push({ cat: r["카테고리"], name: r["아이템명"], brand: r["브랜드"], url: r["구매링크"], img: r["이미지"] }));
     SOURCES = {};
     sr.filter(r => evById[r["행사ID"]])
       .forEach(r => (SOURCES[r["행사ID"]] ??= []).push({ platform: PLATFORM_BY_LABEL[r["플랫폼"]], author: r["계정"], url: r["원본URL"] }));

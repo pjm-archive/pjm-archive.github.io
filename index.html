@@ -169,6 +169,40 @@ main{padding-block:20px 32px}
 .site-foot .credit a:hover{border-bottom-color:var(--fg)}
 .site-foot .credit svg{width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:1.3}
 .site-foot .note{font-size:11px;color:var(--muted);line-height:1.5}
+.ev .hints{display:flex;gap:6px;margin-top:2px}
+.ev .hints span{font-size:11px;color:var(--muted);border:1px solid var(--line);padding:2px 7px}
+.ev .hints span.on{color:var(--fg);border-color:var(--fg)}
+.evmeta{margin:10px 0 0;display:grid;grid-template-columns:36px 1fr;gap:4px 8px;font-size:13px}
+.evmeta dt{color:var(--muted);font-size:11px;padding-top:2px}.evmeta dd{margin:0;min-width:0}
+.sec{margin:26px 0 8px;font-size:12px;font-weight:500;color:var(--muted);letter-spacing:.02em;display:flex;gap:6px;align-items:baseline;border-bottom:1px solid var(--line-strong);padding-bottom:8px}
+.sec span{font-family:var(--mono);color:var(--fg)}
+.prows{display:flex;flex-direction:column}
+.prow{display:grid;grid-template-columns:auto 1fr 14px;gap:12px;align-items:center;width:100%;text-align:left;padding-block:10px;border-bottom:1px solid var(--line)}
+.prow > svg{width:14px;height:14px;stroke:var(--muted);fill:none;stroke-width:1.2}
+.prow .pt{min-width:0;display:flex;flex-direction:column;gap:1px}
+.prow .pc{font-size:10.5px;color:var(--muted);font-family:var(--mono)}
+.prow .pn{font-size:13.5px;font-weight:500;line-height:1.4;word-break:keep-all;overflow-wrap:anywhere}
+.prow .pb{font-size:11.5px;color:var(--muted)}
+.evicon{width:44px;display:grid;place-items:center}
+.pthumb{position:relative;display:block;aspect-ratio:1;width:100%;max-width:100%;background:#fff;border:1px solid var(--line);overflow:hidden}
+.pthumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:6%}
+.pthumb .fb{position:absolute;inset:0;display:grid;place-items:center;font-size:26px;opacity:.55}
+.pthumb img + .fb{display:none}
+.pthumb.sm{width:56px}
+.pthumb.lg{width:100%}
+.pthumb.lg .fb{font-size:56px}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px 12px;padding-block:6px 22px;border-bottom:0 !important}
+.list li.pgrid{border-bottom:0}
+.list .pcard{display:flex;padding:0;align-items:stretch;flex-direction:column;gap:3px;text-align:left;min-width:0}
+.pcard .pthumb{margin-bottom:6px}
+.pcard .pb{font-size:10.5px;color:var(--muted);font-family:var(--mono);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard .pn{font-size:13px;font-weight:500;line-height:1.38;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:keep-all;overflow-wrap:anywhere}
+.pcard .pd{font-size:10.5px;color:var(--muted);font-family:var(--mono)}
+.pcard:hover .pthumb{border-color:var(--fg)}
+.pdetail{padding-top:10px;display:flex;flex-direction:column}
+.pdetail .pb{margin:16px 0 0;font-size:11.5px;color:var(--muted);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.pdetail .pn{margin:4px 0 14px;font-size:18px;font-weight:500;line-height:1.4;word-break:keep-all;overflow-wrap:anywhere}
+.hint-s{margin:6px 0 0;font-size:11px;color:var(--muted)}
 .empty{color:var(--muted);font-size:13px;padding-block:20px}
 </style>
 </head>
@@ -239,6 +273,6 @@ main{padding-block:20px 32px}
     <div class="sheet-body" id="sheetBody"></div>
   </div>
 </div>
-<script src="app.js?v=20261119-r2"></script>
+<script src="app.js?v=20261120-a1"></script>
 </body>
 </html>
