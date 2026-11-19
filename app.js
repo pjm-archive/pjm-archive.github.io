@@ -11,11 +11,12 @@ const TYPES = {
   book:      { label: "북토크",   chip: "북토크", cls: "book" },
   tv:        { label: "방송",     chip: "방송",   cls: "tv" },
   concert:   { label: "콘서트",   chip: "콘서트", cls: "etc" },
-  fancafe:   { label: "팬카페",   kind: "app" }
+  fancafe:   { label: "팬카페",   kind: "app" },
+  blog:      { label: "블로그",   kind: "app" }
 };
-const TYPE_BY_LABEL = { "유튜브":"youtube", "인스타그램":"instagram", "GV":"gv", "무대인사":"muin", "북토크":"book", "방송":"tv", "콘서트":"concert", "팬카페":"fancafe" };
-const PLATFORM_BY_LABEL = { "X":"x", "인스타그램":"instagram", "유튜브":"youtube", "네이버 카페":"cafe" };
-const PLATFORM_LABEL = { x:"X", instagram:"인스타그램", youtube:"유튜브", cafe:"네이버 카페" };
+const TYPE_BY_LABEL = { "유튜브":"youtube", "인스타그램":"instagram", "GV":"gv", "무대인사":"muin", "북토크":"book", "방송":"tv", "콘서트":"concert", "팬카페":"fancafe", "블로그":"blog" };
+const PLATFORM_BY_LABEL = { "X":"x", "인스타그램":"instagram", "유튜브":"youtube", "네이버 카페":"cafe", "네이버 블로그":"blog" };
+const PLATFORM_LABEL = { x:"X", instagram:"인스타그램", youtube:"유튜브", cafe:"네이버 카페", blog:"네이버 블로그" };
 const CAT_EMOJI = { "아우터":"🧥", "상의":"👕", "하의":"👖", "신발":"👟", "잡화":"👜", "기타":"✨" };
 
 const APP_ICON = {
@@ -24,6 +25,7 @@ const APP_ICON = {
   x: '<svg class="app" viewBox="0 0 18 18" aria-label="X"><rect x="1.5" y="1.5" width="15" height="15" rx="3.5" fill="#000"/><path d="M5.2 5h2.3l5.3 8H10.5zM12.6 5 5.4 13" stroke="#fff" stroke-width="1.1" fill="none"/></svg>'
 };
 APP_ICON.fancafe = APP_ICON.cafe = '<svg class="app" viewBox="0 0 18 18" aria-label="네이버 카페"><rect x="1.5" y="1.5" width="15" height="15" rx="4" fill="#03c75a"/><path d="M5.5 6.5h6v3.2a3 3 0 0 1-3 3h0a3 3 0 0 1-3-3zM11.5 7.3h.7a1.3 1.3 0 0 1 0 2.6h-.9" stroke="#fff" stroke-width="1.2" fill="none"/></svg>';
+APP_ICON.blog = '<svg class="app" viewBox="0 0 18 18" aria-label="네이버 블로그"><rect x="1.5" y="1.5" width="15" height="15" rx="4" fill="#03c75a"/><path d="M6.2 4.8v8.4M6.2 9.6a2.6 2.6 0 1 1 0 .01" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>';
 const mark = t => { const T = TYPES[t]; return T.kind === "app" ? APP_ICON[t] : `<span class="chip ${T.cls}">${T.chip}</span>`; };
 
 /* ---------- 유틸 ---------- */
