@@ -142,6 +142,7 @@ function periodLabel() {
   return `${from ? ymLabel(from) : "처음"} – ${to ? ymLabel(to) : "지금"}`;
 }
 function itemIds() { return Object.keys(ITEMS).filter(id => evById[id]); }
+let lastListIds = null;   // 목록에 지금 보이는 행사들 (팝업 이전/다음 범위)
 
 function renderPeriodPanel() {
   const months = itemIds().map(id => ym(evById[id].date));
@@ -181,6 +182,7 @@ function renderList() {
   const ids = inRange
     .filter(id => !brandFilter || ITEMS[id].some(it => it.brand === brandFilter))
     .sort((a, b) => (sortDir === "desc" ? -1 : 1) * (evById[a].date.localeCompare(evById[b].date) || a.localeCompare(b)));
+  lastListIds = ids;
   if (!ids.length) {
     const any = itemIds().length;
     $("#itemList").innerHTML = `<li class="empty">${any ? "조건에 맞는 아이템 정보가 없어요." : "아직 등록된 아이템 정보가 없어요."}${any ? ` <button class="reset" id="resetFilters">필터 초기화</button>` : ""}</li>`;
@@ -255,7 +257,9 @@ function hydrateEmbeds() {
 }
 
 /* ---------- 시트(팝업) ---------- */
-let backTo = null, lastFocus = null;
+// 화면 스택: 날짜 상세 → (아이템) 순서로 쌓이고, 브라우저 뒤로가기와 연동된다.
+// 이전/다음은 항상 날짜순(‹ 이전 날짜, › 다음 날짜)으로 이동하고 스택 깊이는 그대로 둔다.
+let stack = [], lastFocus = null;
 function showSheet() {
   if (!$("#sheet").hidden) return;
   lastFocus = document.activeElement;
@@ -264,13 +268,56 @@ function showSheet() {
   document.body.style.overflow = "hidden";
   setTimeout(() => $("#close").focus(), 50);
 }
-function closeSheet() {
+function hideSheet() {
   $("#scrim").classList.remove("on"); $("#sheet").classList.remove("on");
   document.body.style.overflow = "";
   setTimeout(() => { $("#scrim").hidden = true; $("#sheet").hidden = true; lastFocus && lastFocus.focus(); }, 250);
 }
-function openDay(date) {
-  backTo = null; $("#back").hidden = true;
+const byDateId = (a, b) => evById[a].date.localeCompare(evById[b].date) || a.localeCompare(b);
+function navList(view) {
+  return view.v === "day" ? Object.keys(byDate).sort() : [...(view.scope || itemIds())].sort(byDateId);
+}
+const viewKey = v => v.v === "day" ? v.date : v.id;
+function render(view, dir = 0) {
+  const list = navList(view), i = list.indexOf(viewKey(view));
+  $("#prevS").disabled = i <= 0;
+  $("#nextS").disabled = i < 0 || i >= list.length - 1;
+  $("#sheetPos").textContent = i >= 0 && list.length > 1 ? `${i + 1} / ${list.length}` : "";
+  $("#back").style.visibility = stack.length < 2 ? "hidden" : "visible";   // 자리는 유지해서 제목이 가운데 오게
+  view.v === "day" ? renderDay(view.date) : renderItems(view.id);
+  const body = $("#sheetBody");
+  body.scrollTop = 0;
+  body.classList.remove("in-l", "in-r");
+  if (dir) { void body.offsetWidth; body.classList.add(dir > 0 ? "in-r" : "in-l"); }
+}
+function push(view) {
+  stack.push(view);
+  history.pushState({ pjm: stack.length }, "");
+  render(view); showSheet();
+}
+function go(dir) {
+  const view = stack[stack.length - 1]; if (!view) return;
+  const list = navList(view), j = list.indexOf(viewKey(view)) + dir;
+  if (j < 0 || j >= list.length) return;
+  const next = view.v === "day" ? { ...view, date: list[j] } : { ...view, id: list[j] };
+  stack[stack.length - 1] = next;
+  render(next, dir);
+  if (next.v === "day") { const d = next.date; const m = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, 1); if (m.getTime() !== cur.getTime()) { cur = m; renderCal(); } }
+}
+function openDay(date) { stack = []; push({ v: "day", date }); }
+function openItems(id, fromDate) {
+  if (fromDate) push({ v: "items", id });                         // 날짜 상세에서 들어옴: 전체 아이템을 날짜순으로
+  else { stack = []; push({ v: "items", id, scope: lastListIds }); } // 목록에서 들어옴: 지금 걸린 필터 결과 안에서
+}
+function closeAll() { if (stack.length) history.go(-stack.length); }
+addEventListener("popstate", e => {
+  const d = e.state?.pjm || 0;
+  if (d >= stack.length) return;
+  stack.length = d;
+  if (!d) hideSheet(); else render(stack[d - 1]);
+});
+
+function renderDay(date) {
   $("#sheetTitle").textContent = fmtDate(date);
   $("#sheetBody").innerHTML = (byDate[date] || []).map(e => {
     const has = !!ITEMS[e.id];
@@ -287,12 +334,9 @@ function openDay(date) {
     }).join("");
     return `<article class="ev"><div class="type">${mark(e.type)}${TYPES[e.type].label}</div><h3>${title}</h3>${dl ? `<dl>${dl}</dl>` : ""}${links}</article>`;
   }).join("");
-  $("#sheetBody").scrollTop = 0;
-  showSheet();
 }
-function openItems(id, fromDate) {
+function renderItems(id) {
   const e = evById[id];
-  backTo = fromDate; $("#back").hidden = !fromDate;
   $("#sheetTitle").textContent = fmtDate(e.date);
   const list = ITEMS[id] || [], srcs = SOURCES[id] || [];
   $("#sheetBody").innerHTML =
@@ -305,18 +349,32 @@ function openItems(id, fromDate) {
         ${url ? `<a class="buy" href="${esc(url)}" target="_blank" rel="noopener">구매 링크<svg viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a>` : `<div class="empty">구매 링크 정보 없음</div>`}
       </article>`;
     }).join("");
-  $("#sheetBody").scrollTop = 0;
-  showSheet();
   hydrateEmbeds();
 }
 $("#sheetBody").addEventListener("click", ev => {
   const b = ev.target.closest("button[data-items]");
   if (b) { const id = b.dataset.items; openItems(id, evById[id].date); }
 });
-$("#back").onclick = () => { if (backTo) openDay(backTo); };
-$("#close").onclick = closeSheet;
-$("#scrim").onclick = closeSheet;
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#sheet").hidden) closeSheet(); });
+$("#back").onclick = () => history.back();
+$("#close").onclick = closeAll;
+$("#scrim").onclick = closeAll;
+$("#prevS").onclick = () => go(-1);
+$("#nextS").onclick = () => go(1);
+document.addEventListener("keydown", e => {
+  if ($("#sheet").hidden) return;
+  if (e.key === "Escape") closeAll();
+  else if (e.key === "ArrowLeft") go(-1);
+  else if (e.key === "ArrowRight") go(1);
+});
+// 좌우 스와이프: 왼쪽으로 밀면 다음, 오른쪽으로 밀면 이전
+let touch = null;
+$("#sheetBody").addEventListener("touchstart", e => { const t = e.touches[0]; touch = { x: t.clientX, y: t.clientY }; }, { passive: true });
+$("#sheetBody").addEventListener("touchend", e => {
+  if (!touch) return;
+  const t = e.changedTouches[0], dx = t.clientX - touch.x, dy = t.clientY - touch.y;
+  touch = null;
+  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
+}, { passive: true });
 
 /* ---------- 부팅 ---------- */
 async function boot() {
