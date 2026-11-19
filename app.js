@@ -184,15 +184,44 @@ const lastWear = (g, inRange = () => true) => g.wears.filter(w => inRange(w.date
 const byLatest = (a, b) => { const x = GROUPS[a].wears.at(-1), y = GROUPS[b].wears.at(-1); return x.date.localeCompare(y.date) || x.id.localeCompare(y.id) || x.i - y.i; };
 let lastListKeys = [];   // 아이템 탭에 지금 보이는 아이템들 (상세에서 이전/다음 범위)
 
-function renderBrands(groups) {
-  const count = {};
-  groups.forEach(p => p.it.brand && (count[p.it.brand] = (count[p.it.brand] || 0) + 1));
-  const brands = Object.keys(count).sort((a, b) => count[b] - count[a] || a.localeCompare(b, "ko"));
-  const keep = brandFilter && !count[brandFilter] ? [[brandFilter, brandFilter, 0]] : [];
-  $("#brandBar").hidden = brands.length + keep.length < 2;
-  $("#brandBar").innerHTML = [["", "전체"], ...brands.map(b => [b, b, count[b]]), ...keep].map(([v, label, n]) =>
-    `<button class="bf" data-brand="${esc(v)}" aria-pressed="${v === brandFilter}">${esc(label)}${v ? `<span>${n}</span>` : ""}</button>`
-  ).join("");
+let catFilter = store.get("pjm-cat", "");
+const CATS = ["아우터", "상의", "하의", "신발", "잡화", "기타"];
+// 영문으로 저장된 브랜드를 한글로도 찾을 수 있게
+const BRAND_ALIAS = {
+  "carhartt wip": "칼하트", "prada": "프라다", "pilot": "파이롯트 파일럿", "dickies": "디키즈", "espionage": "에스피오나지",
+  "nonymousaa": "넌이머스 논이머스", "kodak": "코닥", "seed": "씨드", "ito-ya": "이토야", "blue elephant": "블루엘리펀트",
+  "b-side label": "비사이드라벨", "sylian rail": "실리안레일", "the loose company": "더루즈컴퍼니 루즈컴퍼니", "르무통": "le mouton lemouton"
+};
+const brandMatch = (b, q) => !q || (b + " " + (BRAND_ALIAS[b.toLowerCase()] || "")).toLowerCase().replace(/\s/g, "").includes(q.toLowerCase().replace(/\s/g, ""));
+
+function renderCats(groups) {
+  const count = {}; groups.forEach(g => count[g.it.cat] = (count[g.it.cat] || 0) + 1);
+  const extra = Object.keys(count).filter(c => !CATS.includes(c));
+  $("#catBar").innerHTML = [["", "전체", groups.length], ...[...CATS, ...extra].map(c => [c, c, count[c] || 0])].map(([v, label, n]) =>
+    `<button class="bf${n || v === catFilter ? "" : " zero"}" data-cat="${esc(v)}" aria-pressed="${v === catFilter}"${!n && v !== catFilter && v ? " disabled" : ""}>${esc(label)}<span>${n}</span></button>`).join("");
+}
+let brandCounts = {};
+function renderBrandPanel() {
+  const q = $("#bSearch").value.trim();
+  const all = Object.keys(brandCounts).sort((a, b) => a.localeCompare(b, "ko", { sensitivity: "base" }));
+  const freq = all.filter(b => brandCounts[b] >= 2).sort((a, b) => brandCounts[b] - brandCounts[a]);
+  const chip = b => `<button class="bf" data-brand="${esc(b)}" aria-pressed="${b === brandFilter}">${esc(b)}<span>${brandCounts[b]}</span></button>`;
+  $("#bFreqWrap").hidden = !!q || !freq.length;
+  $("#bFreq").innerHTML = freq.map(chip).join("");
+  const hits = all.filter(b => brandMatch(b, q));
+  $("#bAll").innerHTML = hits.length
+    ? hits.map(b => `<li><button data-brand="${esc(b)}" aria-pressed="${b === brandFilter}"><span>${esc(b)}</span><small>${brandCounts[b]}</small></button></li>`).join("")
+    : `<li class="none">"${esc(q)}"에 맞는 브랜드가 없어요.</li>`;
+}
+function renderBrandBtn() {
+  $("#brandLabel").textContent = brandFilter || "브랜드";
+  $("#brandBtn").classList.toggle("on", !!brandFilter);
+  $("#brandClear").hidden = !brandFilter;
+}
+function setBrand(b) {
+  brandFilter = b; store.set("pjm-brand", b);
+  $("#brandPanel").hidden = true; $("#brandBtn").setAttribute("aria-expanded", false);
+  renderList();
 }
 // 상품 사진. 없거나 못 불러오면 카테고리 아이콘 칸으로
 function thumb(it, cls = "pthumb") {
@@ -205,38 +234,53 @@ function renderList() {
   renderPeriodPanel();
   // 기간 안에 한 번이라도 입은 옷만, 기간 안의 마지막 착용일 기준으로
   const inRange = Object.values(GROUPS).map(g => ({ ...g, at: lastWear(g, inPeriod) })).filter(g => g.at);
-  renderBrands(inRange);
+  // 카테고리 개수는 브랜드 필터 반영, 브랜드 개수는 카테고리 필터 반영
+  renderCats(inRange.filter(g => !brandFilter || g.it.brand === brandFilter));
+  brandCounts = {}; inRange.filter(g => !catFilter || g.it.cat === catFilter).forEach(g => g.it.brand && (brandCounts[g.it.brand] = (brandCounts[g.it.brand] || 0) + 1));
+  renderBrandBtn(); if (!$("#brandPanel").hidden) renderBrandPanel();
   const chrono = (a, b) => a.at.date.localeCompare(b.at.date) || a.at.id.localeCompare(b.at.id) || a.at.i - b.at.i;
-  const pieces = inRange.filter(p => !brandFilter || p.it.brand === brandFilter)
+  const pieces = inRange.filter(p => (!brandFilter || p.it.brand === brandFilter) && (!catFilter || p.it.cat === catFilter))
     .map(p => ({ ...p, n: p.wears.filter(w => inPeriod(w.date)).length }))   // 기간 안 착용 횟수
     .sort((a, b) => sortDir === "most" ? (b.n - a.n || chrono(b, a)) : (sortDir === "desc" ? chrono(b, a) : chrono(a, b)));
   lastListKeys = pieces.map(p => p.key);
   if (!pieces.length) {
     const any = itemIds().length;
+    $("#pCount").textContent = "0개";
     $("#itemList").innerHTML = `<li class="empty">${any ? "조건에 맞는 아이템 정보가 없어요." : "아직 등록된 아이템 정보가 없어요."}${any ? ` <button class="reset" id="resetFilters">필터 초기화</button>` : ""}</li>`;
     return;
   }
   // 월 구분 없이 아이템당 한 장. 날짜는 (기간 안의) 최근 착용일
   const short = d => d.startsWith(String(TODAY.getFullYear())) ? d.slice(5).replace("-", ".") : d.slice(2).replace(/-/g, ".");   // 올해는 월.일, 지난해는 연.월.일
-  $("#itemList").innerHTML = `<li class="pcount">${pieces.length}개</li><li class="pgrid">` +
+  const filtered = brandFilter || catFilter || period.from || period.to;
+  $("#pCount").innerHTML = `${pieces.length}개${filtered ? `<button class="reset" id="resetFilters">필터 초기화</button>` : ""}`;
+  $("#itemList").innerHTML = `<li class="pgrid">` +
     pieces.map(p => `<button class="pcard" data-key="${esc(p.key)}">${thumb(p.it)}
         <span class="pb">${esc(p.it.brand || "")}</span>
         <span class="pn">${esc(p.it.name)}</span>
         <span class="pd">${p.n > 1 ? "최근 " : ""}${short(p.at.date)} · ${esc(p.it.cat)}${p.n > 1 ? ` · <b>착용 ${p.n}회</b>` : ""}</span>
       </button>`).join("") + `</li>`;
 }
-$("#itemList").addEventListener("click", e => {
-  if (e.target.closest("#resetFilters")) { brandFilter = ""; store.set("pjm-brand", ""); setPeriod({ from: "", to: "" }); return; }
+$("#view-items").addEventListener("click", e => {
+  if (e.target.closest("#resetFilters")) { brandFilter = ""; catFilter = ""; store.set("pjm-brand", ""); store.set("pjm-cat", ""); setPeriod({ from: "", to: "" }); return; }
   const b = e.target.closest("button[data-key]"); if (b) openItem(b.dataset.key, lastListKeys);
 });
-$("#brandBar").addEventListener("click", e => {
-  const b = e.target.closest("button[data-brand]"); if (!b) return;
-  brandFilter = b.dataset.brand; store.set("pjm-brand", brandFilter); renderList();
+$("#catBar").addEventListener("click", e => {
+  const b = e.target.closest("button[data-cat]"); if (!b || b.disabled) return;
+  catFilter = b.dataset.cat; store.set("pjm-cat", catFilter); renderList();
 });
-$("#periodBtn").addEventListener("click", () => {
-  const open = $("#periodPanel").hidden;
-  $("#periodPanel").hidden = !open; $("#periodBtn").setAttribute("aria-expanded", open);
-});
+// 기간·브랜드 패널은 하나만 열리게
+function togglePanel(name) {
+  [["period", "#periodPanel", "#periodBtn"], ["brand", "#brandPanel", "#brandBtn"]].forEach(([n, panel, btn]) => {
+    const open = n === name && $(panel).hidden;
+    $(panel).hidden = !open; $(btn).setAttribute("aria-expanded", open);
+  });
+  if (!$("#brandPanel").hidden) { $("#bSearch").value = ""; renderBrandPanel(); }
+}
+$("#periodBtn").addEventListener("click", () => togglePanel("period"));
+$("#brandBtn").addEventListener("click", () => togglePanel("brand"));
+$("#brandClear").addEventListener("click", () => setBrand(""));
+$("#bSearch").addEventListener("input", renderBrandPanel);
+$("#brandPanel").addEventListener("click", e => { const b = e.target.closest("button[data-brand]"); if (b) setBrand(b.dataset.brand === brandFilter ? "" : b.dataset.brand); });
 $("#periodPanel").addEventListener("click", e => {
   const q = e.target.closest("[data-quick]"); if (q) setPeriod(QUICK[q.dataset.quick]());
 });
