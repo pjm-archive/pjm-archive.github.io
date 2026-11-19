@@ -234,6 +234,7 @@ $("#sortBtn").addEventListener("click", () => { sortDir = sortDir === "desc" ? "
 // 월 헤더가 상단 고정 메뉴 바로 아래에 붙도록 메뉴 높이를 CSS 변수로
 const syncHeader = () => document.documentElement.style.setProperty("--hdr", $("header").offsetHeight + "px");
 addEventListener("resize", syncHeader); syncHeader();
+document.fonts?.ready.then(syncHeader);   // 웹폰트 로딩 후 높이가 바뀔 수 있어서
 
 /* ---------- 원본 게시물 임베드 ---------- */
 const loaded = {};

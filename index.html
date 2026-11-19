@@ -31,13 +31,15 @@ button:focus-visible,a:focus-visible{outline:1px solid var(--fg);outline-offset:
 .wrap{max-width:480px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 
 /* header */
-header{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--line-strong)}
+header{position:fixed;top:0;left:0;right:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line-strong);padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;padding-top:var(--hdr,96px)}
 .brand{display:flex;justify-content:space-between;align-items:baseline;padding-block:14px 6px}
 .brand h1{margin:0;font-size:19px;font-weight:600;letter-spacing:-.02em;line-height:1.3}
 .brand h1 a{color:inherit;text-decoration:none}
-.guide-link{display:inline-flex;align-items:center;gap:5px;font-family:var(--sans);font-size:12px;color:var(--fg);border:1px solid var(--line);padding:6px 10px;margin-bottom:6px;align-self:flex-start}
-.guide-link svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.3}
-.guide-link:hover{border-color:var(--fg)}
+.site-foot .credit{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.guide-link{display:inline-flex;align-items:center;gap:3px;font-family:var(--sans);font-size:11px;color:var(--muted);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line);letter-spacing:0}
+.guide-link svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:1.3}
+.guide-link:hover{color:var(--fg)}
 .guide{position:fixed;inset:0;z-index:60;background:var(--scrim);display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 .g-in{width:100%;max-width:440px;max-height:100%;background:var(--bg);border:1px solid var(--line-strong);display:flex;flex-direction:column;min-height:0}
 .g-bar{display:flex;justify-content:space-between;align-items:center;padding:8px 8px 8px 16px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px;letter-spacing:.06em}
@@ -167,7 +169,7 @@ main{padding-block:20px 32px}
 .period .quick button[aria-pressed="true"]{border-color:var(--fg);background:var(--fg);color:var(--bg)}
 .period .range{display:grid;grid-template-columns:auto 1fr auto auto 1fr;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
 .period select{min-width:0;width:100%;font:inherit;font-family:var(--mono);font-size:12.5px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:0;padding:6px 6px}
-.list .mhead{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--hdr,88px));z-index:5;background:var(--bg);display:flex;justify-content:space-between;align-items:baseline;padding-block:14px 6px;border-bottom:1px solid var(--line-strong)}
+.list .mhead{position:sticky;top:var(--hdr,96px);z-index:5;background:var(--bg);display:flex;justify-content:space-between;align-items:baseline;padding-block:14px 6px;border-bottom:1px solid var(--line-strong)}
 .list .mhead span{font-family:var(--mono);font-size:15px;font-variant-numeric:tabular-nums}
 .list .mhead small{font-size:11px;color:var(--muted)}
 .list{border-top:0}
@@ -216,7 +218,8 @@ main{padding-block:20px 32px}
 .pcard:hover .pthumb{border-color:var(--fg)}
 .pdetail{padding-top:10px;display:flex;flex-direction:column}
 .pdetail .pb{margin:16px 0 0;font-size:11.5px;color:var(--muted);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase}
-.pdetail .pn{margin:4px 0 14px;font-size:18px;font-weight:500;line-height:1.4;word-break:keep-all;overflow-wrap:anywhere}
+.pdetail h3.pn{margin:4px 0 14px;font-size:18px;font-weight:500;line-height:1.4;word-break:keep-all;overflow-wrap:anywhere}
+.evlink .pn{font-size:16px}
 .hint-s{margin:6px 0 0;font-size:11px;color:var(--muted)}
 .empty{color:var(--muted);font-size:13px;padding-block:20px}
 </style>
@@ -269,8 +272,7 @@ main{padding-block:20px 32px}
 </main>
 
 <footer class="wrap site-foot">
-  <button class="guide-link" id="guideBtn"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M6.3 6.3a1.8 1.8 0 1 1 2.4 1.7c-.5.2-.7.6-.7 1.1v.4M8 11.6v.1"/></svg>사이트 이용 안내</button>
-  <p class="credit">Archived by <a href="https://x.com/oob_oops" target="_blank" rel="noopener">우엉이<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3h7v7M13 3 4 12"/></svg></a></p>
+  <p class="credit"><span>Archived by <a href="https://x.com/oob_oops" target="_blank" rel="noopener">우엉이<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3h7v7M13 3 4 12"/></svg></a></span><button class="guide-link" id="guideBtn"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M6.3 6.3a1.8 1.8 0 1 1 2.4 1.7c-.5.2-.7.6-.7 1.1v.4M8 11.6v.1"/></svg>이용 안내</button></p>
   <p class="note">비공식 팬 아카이브 · 영상과 사진의 권리는 각 원작자에게 있습니다</p>
 </footer>
 
@@ -302,6 +304,6 @@ main{padding-block:20px 32px}
     <div class="sheet-body" id="sheetBody"></div>
   </div>
 </div>
-<script src="app.js?v=20261120-a3"></script>
+<script src="app.js?v=20261120-a4"></script>
 </body>
 </html>
