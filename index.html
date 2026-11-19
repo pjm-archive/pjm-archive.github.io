@@ -107,16 +107,16 @@ main{padding-block:20px 32px}
 .ev{padding-block:16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
 .ev:last-child{border-bottom:0}
 .ev .type{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
-.ev h3{margin:0;font-size:16px;font-weight:500;line-height:1.4;text-wrap:balance}
-.ev h3 button{text-align:left;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;display:inline-flex;align-items:center;gap:4px}
-.ev h3 button svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:1.3;flex:none}
+.ev h3{margin:0;font-size:16px;font-weight:500;line-height:1.4;word-break:keep-all;overflow-wrap:anywhere}
+.ev h3 button{display:inline;text-align:left;font-weight:inherit;line-height:inherit;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+.ev h3 button svg{display:inline-block;width:12px;height:12px;margin-left:3px;vertical-align:-1px;stroke:currentColor;fill:none;stroke-width:1.3}
 .ev dl{margin:0;display:grid;grid-template-columns:36px 1fr;gap:4px 8px;font-size:13px}
 .ev dt{color:var(--muted);font-size:11px;padding-top:2px}
 .ev dd{margin:0;min-width:0}
 
 .item-head{padding-block:16px 4px}
 .item-head .type{font-size:11px;color:var(--muted);display:flex;gap:6px;align-items:center}
-.item-head h3{margin:6px 0 0;font-size:17px;font-weight:500;text-wrap:balance}
+.item-head h3{margin:6px 0 0;font-size:17px;font-weight:500;word-break:keep-all;overflow-wrap:anywhere}
 .srcs{margin-top:14px;display:flex;flex-direction:column;gap:6px}
 .src{display:flex;align-items:center;gap:10px;border:1px solid var(--line);padding:10px 12px;color:var(--fg);text-decoration:none;font-size:13px}
 .src:hover{border-color:var(--fg)}
@@ -239,6 +239,6 @@ main{padding-block:20px 32px}
     <div class="sheet-body" id="sheetBody"></div>
   </div>
 </div>
-<script src="app.js?v=20261119-r1"></script>
+<script src="app.js?v=20261119-r2"></script>
 </body>
 </html>
