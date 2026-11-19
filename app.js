@@ -17,14 +17,15 @@ const TYPES = {
 const TYPE_BY_LABEL = { "유튜브":"youtube", "인스타그램":"instagram", "GV":"gv", "무대인사":"muin", "북토크":"book", "방송":"tv", "콘서트":"concert", "팬카페":"fancafe", "블로그":"blog" };
 const PLATFORM_BY_LABEL = { "X":"x", "인스타그램":"instagram", "유튜브":"youtube", "네이버 카페":"cafe", "네이버 블로그":"blog" };
 const PLATFORM_LABEL = { x:"X", instagram:"인스타그램", youtube:"유튜브", cafe:"네이버 카페", blog:"네이버 블로그" };
-const CAT_CODE = { "아우터":"OUTER", "상의":"TOP", "하의":"BOTTOM", "신발":"SHOES", "잡화":"ACC", "기타":"ETC" };
-const CAT_PRE  = { "아우터":"OUT", "상의":"TOP", "하의":"BTM", "신발":"SHO", "잡화":"ACC", "기타":"ETC" };
-// 흑백 선화 아이콘 (index.html의 <symbol> 사용)
-const icon = (id, label) => `<svg class="ic" role="img" aria-label="${label}"><use href="#i-${id}"/></svg>`;
+const CAT_EMOJI = { "아우터":"🧥", "상의":"👕", "하의":"👖", "신발":"👟", "잡화":"👜", "기타":"✨" };
+
 const APP_ICON = {
-  youtube: icon("youtube", "유튜브"), instagram: icon("instagram", "인스타그램"), x: icon("x", "X"),
-  cafe: icon("cafe", "네이버 카페"), fancafe: icon("cafe", "팬카페"), blog: icon("blog", "블로그")
+  youtube: '<svg class="app" viewBox="0 0 18 18" aria-label="유튜브"><rect x="1" y="3.5" width="16" height="11" rx="3" fill="#e5302a"/><path d="M7.4 6.6v4.8L11.6 9z" fill="#fff"/></svg>',
+  instagram: '<svg class="app" viewBox="0 0 18 18" aria-label="인스타그램"><defs><linearGradient id="ig" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#f6a13a"/><stop offset=".5" stop-color="#e2336b"/><stop offset="1" stop-color="#7a3fc4"/></linearGradient></defs><rect x="1.5" y="1.5" width="15" height="15" rx="4.2" fill="url(#ig)"/><circle cx="9" cy="9" r="3.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="13" cy="5" r=".9" fill="#fff"/></svg>',
+  x: '<svg class="app" viewBox="0 0 18 18" aria-label="X"><rect x="1.5" y="1.5" width="15" height="15" rx="3.5" fill="#000"/><path d="M5.2 5h2.3l5.3 8H10.5zM12.6 5 5.4 13" stroke="#fff" stroke-width="1.1" fill="none"/></svg>'
 };
+APP_ICON.fancafe = APP_ICON.cafe = '<svg class="app" viewBox="0 0 18 18" aria-label="네이버 카페"><rect x="1.5" y="1.5" width="15" height="15" rx="4" fill="#03c75a"/><path d="M5.5 6.5h6v3.2a3 3 0 0 1-3 3h0a3 3 0 0 1-3-3zM11.5 7.3h.7a1.3 1.3 0 0 1 0 2.6h-.9" stroke="#fff" stroke-width="1.2" fill="none"/></svg>';
+APP_ICON.blog = '<svg class="app" viewBox="0 0 18 18" aria-label="네이버 블로그"><rect x="1.5" y="1.5" width="15" height="15" rx="4" fill="#03c75a"/><path d="M6.2 4.8v8.4M6.2 9.6a2.6 2.6 0 1 1 0 .01" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>';
 // 사이트가 모르는 종류가 시트에 들어와도 일정이 사라지지 않게 회색 글자 칩으로 표시
 function typeKey(label) {
   if (!label) return "";
@@ -33,13 +34,13 @@ function typeKey(label) {
   TYPES[k] ??= { label, chip: label, cls: "etc" };
   return k;
 }
-const mark = t => { const T = TYPES[t]; return T.kind === "app" ? APP_ICON[t] : `<span class="chip">${esc(T.chip)}</span>`; };
+const mark = t => { const T = TYPES[t]; return T.kind === "app" ? APP_ICON[t] : `<span class="chip ${T.cls}">${T.chip}</span>`; };
 
 /* ---------- 유틸 ---------- */
 const $ = s => document.querySelector(s);
 const pad = n => String(n).padStart(2, "0");
 const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const DOW = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
+const DOW = ["일","월","화","수","목","금","토"];
 const fmtDate = s => { const d = new Date(s + "T00:00"); return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${DOW[d.getDay()]}`; };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
 const safeUrl = u => /^https?:\/\//i.test(u || "") ? u : "";
@@ -96,27 +97,22 @@ function renderCal() {
     const d = new Date(start); d.setDate(start.getDate() + i);
     const k = ymd(d), evs = byDate[k] || [], out = d.getMonth() !== cur.getMonth();
     const cls = ["day", out && "out", k === ymd(TODAY) && "today", evs.length && "has"].filter(Boolean).join(" ");
-    const pcs = evs.reduce((n, e) => n + (ITEMS[e.id]?.length || 0), 0);   // 그날 입은 아이템 수
-    // 같은 종류는 아이콘 하나 + ×개수로 묶고, 칸에는 두 종류까지만
+    // 같은 종류는 아이콘 하나 + 개수로 묶기
     const groups = [];
     evs.forEach(e => { const g = groups.find(x => x.type === e.type); g ? g.n++ : groups.push({ type: e.type, n: 1 }); });
-    const shown = groups.slice(0, 2).map(g => `<span class="g">${mark(g.type)}${g.n > 1 ? `<span class="x">×${g.n}</span>` : ""}</span>`).join("");
-    const rest = groups.slice(2).reduce((s, g) => s + g.n, 0);
+    const shown = groups.slice(0, 3).map(g => `<span class="mk">${mark(g.type)}${g.n > 1 ? `<b>${g.n}</b>` : ""}</span>`).join("");
+    const rest = groups.slice(3).reduce((s, g) => s + g.n, 0);
     const more = rest ? `<span class="more">+${rest}</span>` : "";
-    const num = `<span class="n"><span>${pad(d.getDate())}</span>${pcs ? `<em title="아이템 ${pcs}개">${pcs}</em>` : ""}</span>`;
     html += evs.length
-      ? `<button class="${cls}" data-date="${k}" aria-label="${fmtDate(k)} 일정 ${evs.length}건${pcs ? `, 아이템 ${pcs}개` : ""}">${num}<span class="marks">${shown}${more}</span></button>`
-      : `<div class="${cls}">${num}</div>`;
+      ? `<button class="${cls}" data-date="${k}" aria-label="${fmtDate(k)} 일정 ${evs.length}건"><span class="n">${d.getDate()}</span><span class="marks">${shown}${more}</span></button>`
+      : `<div class="${cls}"><span class="n">${d.getDate()}</span></div>`;
   }
   $("#grid").innerHTML = html;
-  const m = ymd(cur).slice(0, 7), n = EVENTS.filter(e => e.date.startsWith(m)).length;
-  $("#monthCnt").textContent = n ? `${n} ENTRIES` : "";
 }
 $("#grid").addEventListener("click", e => { const b = e.target.closest(".day.has"); if (b) openDay(b.dataset.date); });
 $("#prev").onclick = () => { cur.setMonth(cur.getMonth() - 1); renderCal(); };
 $("#next").onclick = () => { cur.setMonth(cur.getMonth() + 1); renderCal(); };
-const renderLegend = () => { $("#legend").innerHTML = Object.entries(TYPES).map(([k, T]) => `<span>${mark(k)}${T.kind === "app" ? T.label : (T.chip === T.label ? "" : T.label)}</span>`).join("") + `<span><em>2</em>아이템 수</span>`; };
-renderLegend();
+$("#legend").innerHTML = Object.entries(TYPES).map(([k, T]) => `<span>${mark(k)}${T.label}</span>`).join("");
 
 /* ---------- 아이템 목록 ---------- */
 const store = {
@@ -169,70 +165,52 @@ function setPeriod(p) {
   period = p; store.set("pjm-period", JSON.stringify(period)); renderList();
 }
 
-let catFilter = store.get("pjm-cat", "");
-const pad3 = n => String(n).padStart(3, "0");
-// 모든 아이템을 날짜순으로 펼치고 고유 번호(품번)를 매긴다
-function allPieces() {
-  const ids = itemIds().sort((a, b) => evById[a].date.localeCompare(evById[b].date) || a.localeCompare(b));
-  let seq = 0; const out = [];
-  ids.forEach(id => ITEMS[id].forEach((it, i) => out.push({ id, i, it, seq: ++seq })));
-  return out;
-}
-function chipBar(el, attr, current, entries) {
-  el.innerHTML = entries.map(([v, label, n]) =>
-    `<button data-${attr}="${esc(v)}" aria-pressed="${v === current}">${esc(label)}${n != null ? `<span>${n}</span>` : ""}</button>`).join("");
+function renderBrands(ids) {
+  const count = {};
+  ids.forEach(id => new Set(ITEMS[id].map(it => it.brand).filter(Boolean)).forEach(b => count[b] = (count[b] || 0) + 1));
+  const brands = Object.keys(count).sort((a, b) => count[b] - count[a] || a.localeCompare(b, "ko"));
+  const keep = brandFilter && !count[brandFilter] ? [[brandFilter, brandFilter, 0]] : [];   // 선택한 브랜드가 기간 밖이면 0으로 남겨둠
+  $("#brandBar").hidden = brands.length + keep.length < 2;
+  $("#brandBar").innerHTML = [["", "전체"], ...brands.map(b => [b, b, count[b]]), ...keep].map(([v, label, n]) =>
+    `<button class="bf" data-brand="${esc(v)}" aria-pressed="${v === brandFilter}">${esc(label)}${v ? `<span>${n}</span>` : ""}</button>`
+  ).join("");
 }
 function renderList() {
   renderPeriodPanel();
-  const inRange = allPieces().filter(p => inPeriod(evById[p.id].date));
-  // 카테고리
-  const catCount = {}; inRange.forEach(p => catCount[p.it.cat] = (catCount[p.it.cat] || 0) + 1);
-  const cats = Object.keys(CAT_CODE).filter(c => catCount[c]);
-  if (catFilter && !catCount[catFilter]) cats.push(catFilter);
-  chipBar($("#catBar"), "cat", catFilter, [["", "ALL", inRange.length], ...cats.map(c => [c, CAT_CODE[c] || c, catCount[c] || 0])]);
-  const byCat = inRange.filter(p => !catFilter || p.it.cat === catFilter);
-  // 브랜드
-  const count = {}; byCat.forEach(p => p.it.brand && (count[p.it.brand] = (count[p.it.brand] || 0) + 1));
-  const brands = Object.keys(count).sort((a, b) => count[b] - count[a] || a.localeCompare(b, "ko"));
-  if (brandFilter && !count[brandFilter]) brands.push(brandFilter);
-  $("#brandBar").hidden = brands.length < 2;
-  chipBar($("#brandBar"), "brand", brandFilter, [["", "ALL BRANDS"], ...brands.map(b => [b, b, count[b] || 0])]);
-  $("#brandBar").querySelectorAll("button").forEach(b => b.classList.add("bf"));
-  const pieces = byCat.filter(p => !brandFilter || p.it.brand === brandFilter)
-    .sort((a, b) => (sortDir === "desc" ? b.seq - a.seq : a.seq - b.seq));
-  lastListIds = [...new Set(pieces.map(p => p.id))];
-  if (!pieces.length) {
+  const inRange = itemIds().filter(id => inPeriod(evById[id].date));
+  renderBrands(inRange);
+  const ids = inRange
+    .filter(id => !brandFilter || ITEMS[id].some(it => it.brand === brandFilter))
+    .sort((a, b) => (sortDir === "desc" ? -1 : 1) * (evById[a].date.localeCompare(evById[b].date) || a.localeCompare(b)));
+  lastListIds = ids;
+  if (!ids.length) {
     const any = itemIds().length;
     $("#itemList").innerHTML = `<li class="empty">${any ? "조건에 맞는 아이템 정보가 없어요." : "아직 등록된 아이템 정보가 없어요."}${any ? ` <button class="reset" id="resetFilters">필터 초기화</button>` : ""}</li>`;
     return;
   }
-  const months = [];
-  pieces.forEach(p => { const m = ym(evById[p.id].date); (months.at(-1)?.m === m ? months.at(-1) : (months.push({ m, list: [] }), months.at(-1))).list.push(p); });
-  $("#itemList").innerHTML = months.map(({ m, list }) =>
-    `<li class="mhead"><span>${ymLabel(m)}</span><small>${list.length} PCS</small></li><li class="tags">${list.map(tagCard).join("")}</li>`).join("");
-}
-function tagCard(p) {
-  const e = evById[p.id], it = p.it;
-  return `<button class="tag" data-id="${esc(p.id)}" data-i="${p.i}">
-    <span class="no">${CAT_PRE[it.cat] || "ETC"}-${pad3(p.seq)}</span>
-    <span class="br">${esc(it.brand || "—")}</span>
-    <span class="nm">${esc(it.name)}</span>
-    <span class="ev">${e.date.slice(5).replace("-", ".")} · ${esc(e.title)}</span>
-    <span class="bc" aria-hidden="true"></span>
-    <span class="ft"><span>VIEW</span><span>→</span></span>
-  </button>`;
+  let html = "", cur = "";
+  ids.forEach(id => {
+    const e = evById[id], list = ITEMS[id], m = ym(e.date);
+    if (m !== cur) {
+      cur = m;
+      const n = ids.filter(x => ym(evById[x].date) === m).length;
+      html += `<li class="mhead"><span>${ymLabel(m)}</span><small>${n}건</small></li>`;
+    }
+    const brands = [...new Set(list.map(it => it.brand).filter(Boolean))];
+    const sub = brandFilter
+      ? `${esc(brandFilter)} ${list.filter(it => it.brand === brandFilter).length} · 전체 ${list.length}개`
+      : `${brands.map(esc).join(" · ")} · ${list.length}개`;
+    html += `<li><button data-id="${esc(id)}"><span class="thumb" style="display:grid;place-items:center">${mark(e.type)}</span><div class="meta"><div class="date">${fmtDate(e.date)}</div><div class="ttl">${esc(e.title)}</div><div class="cnt">${sub}</div></div><svg class="go" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button></li>`;
+  });
+  $("#itemList").innerHTML = html;
 }
 $("#itemList").addEventListener("click", e => {
-  if (e.target.closest("#resetFilters")) { brandFilter = ""; catFilter = ""; store.set("pjm-brand", ""); store.set("pjm-cat", ""); setPeriod({ from: "", to: "" }); return; }
-  const b = e.target.closest("button[data-id]"); if (b) openItems(b.dataset.id, null, +b.dataset.i);
+  if (e.target.closest("#resetFilters")) { brandFilter = ""; store.set("pjm-brand", ""); setPeriod({ from: "", to: "" }); return; }
+  const b = e.target.closest("button[data-id]"); if (b) openItems(b.dataset.id, null);
 });
 $("#brandBar").addEventListener("click", e => {
   const b = e.target.closest("button[data-brand]"); if (!b) return;
   brandFilter = b.dataset.brand; store.set("pjm-brand", brandFilter); renderList();
-});
-$("#catBar").addEventListener("click", e => {
-  const b = e.target.closest("button[data-cat]"); if (!b) return;
-  catFilter = b.dataset.cat; store.set("pjm-cat", catFilter); renderList();
 });
 $("#periodBtn").addEventListener("click", () => {
   const open = $("#periodPanel").hidden;
@@ -257,21 +235,19 @@ function ytId(u) { const m = u.match(/(?:youtu\.be\/|v=|shorts\/|embed\/|live\/)
 // 같은 영상이 여러 곳에 올라온 경우: 유튜브 > 인스타그램 > X 순으로 하나만 임베드하고 나머지는 링크로
 const SRC_ORDER = { youtube: 0, instagram: 1, x: 2 };
 const orderSrcs = list => [...list].sort((a, b) => (SRC_ORDER[a.platform] ?? 9) - (SRC_ORDER[b.platform] ?? 9));
-function srcLink(s) {
+function srcBlock(s, withEmbed = true) {
   const url = safeUrl(s.url); if (!url) return "";
-  return `<a class="orig" href="${esc(url)}" target="_blank" rel="noopener">${APP_ICON[s.platform] || ""}<span>${PLATFORM_LABEL[s.platform] || "원본"}${s.author ? " · " + esc(s.author) : ""} ↗</span></a>`;
-}
-function srcEmbed(s) {
-  const url = safeUrl(s.url); if (!url) return "";
+  const link = `<a class="src" href="${esc(url)}" target="_blank" rel="noopener">${APP_ICON[s.platform] || ""}<span class="who"><b>원본 게시물 보기</b><small>${PLATFORM_LABEL[s.platform] || ""} · ${esc(s.author)}</small></span><svg class="ext" viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a>`;
+  let embed = "";
   if (s.platform === "x") {
     const tw = url.replace(/^https?:\/\/(www\.)?x\.com/, "https://twitter.com").split("?")[0];
-    return `<blockquote class="twitter-tweet" data-dnt="true"><a href="${esc(tw)}"></a></blockquote>`;
+    embed = `<blockquote class="twitter-tweet" data-dnt="true"><a href="${esc(tw)}"></a></blockquote>`;
+  } else if (s.platform === "instagram") {
+    embed = `<blockquote class="instagram-media" data-instgrm-permalink="${esc(url.split("?")[0])}" data-instgrm-version="14" style="margin:0;min-width:0;width:100%"></blockquote>`;
+  } else if (s.platform === "youtube" && ytId(url)) {
+    embed = `<iframe src="https://www.youtube-nocookie.com/embed/${ytId(url)}" title="유튜브 영상" loading="lazy" allowfullscreen></iframe>`;
   }
-  if (s.platform === "instagram")
-    return `<blockquote class="instagram-media" data-instgrm-permalink="${esc(url.split("?")[0])}" data-instgrm-version="14" style="margin:0;min-width:0;width:100%"></blockquote>`;
-  if (s.platform === "youtube" && ytId(url))
-    return `<iframe src="https://www.youtube-nocookie.com/embed/${ytId(url)}" title="유튜브 영상" loading="lazy" allowfullscreen></iframe>`;
-  return "";
+  return `${embed && withEmbed ? `<div class="embed">${embed}</div>` : ""}${link}`;
 }
 function hydrateEmbeds() {
   const dark = matchMedia("(prefers-color-scheme: dark)").matches;
@@ -311,10 +287,6 @@ function render(view, dir = 0) {
   view.v === "day" ? renderDay(view.date) : renderItems(view.id);
   const body = $("#sheetBody");
   body.scrollTop = 0;
-  if (view.focus != null) {   // 목록에서 누른 행택으로 바로 이동
-    const t = body.querySelector(`.tag[data-i="${view.focus}"]`);
-    if (t && view.focus > 0) { body.scrollTop = t.offsetTop - 12; t.classList.add("flash"); }
-  }
   body.classList.remove("in-l", "in-r");
   if (dir) { void body.offsetWidth; body.classList.add(dir > 0 ? "in-r" : "in-l"); }
 }
@@ -327,15 +299,15 @@ function go(dir) {
   const view = stack[stack.length - 1]; if (!view) return;
   const list = navList(view), j = list.indexOf(viewKey(view)) + dir;
   if (j < 0 || j >= list.length) return;
-  const next = view.v === "day" ? { ...view, date: list[j] } : { ...view, id: list[j], focus: null };
+  const next = view.v === "day" ? { ...view, date: list[j] } : { ...view, id: list[j] };
   stack[stack.length - 1] = next;
   render(next, dir);
   if (next.v === "day") { const d = next.date; const m = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, 1); if (m.getTime() !== cur.getTime()) { cur = m; renderCal(); } }
 }
 function openDay(date) { stack = []; push({ v: "day", date }); }
-function openItems(id, fromDate, focus = null) {
-  if (fromDate) push({ v: "items", id });                                // 날짜 상세에서 들어옴: 전체 아이템을 날짜순으로
-  else { stack = []; push({ v: "items", id, scope: lastListIds, focus }); } // 목록에서 들어옴: 지금 걸린 필터 결과 안에서
+function openItems(id, fromDate) {
+  if (fromDate) push({ v: "items", id });                         // 날짜 상세에서 들어옴: 전체 아이템을 날짜순으로
+  else { stack = []; push({ v: "items", id, scope: lastListIds }); } // 목록에서 들어옴: 지금 걸린 필터 결과 안에서
 }
 function closeAll() { if (stack.length) history.go(-stack.length); }
 addEventListener("popstate", e => {
@@ -346,40 +318,37 @@ addEventListener("popstate", e => {
 });
 
 function renderDay(date) {
-  const evs = byDate[date] || [];
   $("#sheetTitle").textContent = fmtDate(date);
-  // 옷 안쪽 케어 라벨처럼
-  $("#sheetBody").innerHTML = `<div class="care"><div class="top"><span>${fmtDate(date)}</span><span>${pad(evs.length)} ENTRIES</span></div>` +
-    evs.map(e => {
-      const n = ITEMS[e.id]?.length || 0;
-      let dl = "";
-      if (e.place) dl += `<dt>PLACE</dt><dd>${esc(e.place)}</dd>`;
-      if (e.desc) dl += `<dt>NOTE</dt><dd>${esc(e.desc)}</dd>`;
-      const acts = n
-        ? `<button class="pcs" data-items="${esc(e.id)}">${n} PCS <span aria-hidden="true">→</span></button>`
-        : (SOURCES[e.id] || []).map(srcLink).join("");
-      return `<div class="r">${mark(e.type)}<div><h3>${esc(e.title)}</h3>${dl ? `<dl class="meta">${dl}</dl>` : ""}${acts ? `<div class="acts">${acts}</div>` : ""}</div></div>`;
-    }).join("") + `</div>`;
+  $("#sheetBody").innerHTML = (byDate[date] || []).map(e => {
+    const has = !!ITEMS[e.id];
+    const title = has
+      ? `<button data-items="${esc(e.id)}">${esc(e.title)}<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>`
+      : esc(e.title);
+    let dl = "";
+    if (e.place) dl += `<dt>장소</dt><dd>${esc(e.place)}</dd>`;
+    if (e.desc) dl += `<dt>설명</dt><dd>${esc(e.desc)}</dd>`;
+    // 아이템이 없는 일정은 원본 링크를 상세에 바로 노출
+    const links = has ? "" : (SOURCES[e.id] || []).map(s => {
+      const url = safeUrl(s.url); if (!url) return "";
+      return `<a class="src" href="${esc(url)}" target="_blank" rel="noopener">${APP_ICON[s.platform] || ""}<span class="who"><b>원본 게시물 보기</b><small>${PLATFORM_LABEL[s.platform] || ""}${s.author ? " · " + esc(s.author) : ""}</small></span><svg class="ext" viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a>`;
+    }).join("");
+    return `<article class="ev"><div class="type">${mark(e.type)}${TYPES[e.type].label}</div><h3>${title}</h3>${dl ? `<dl>${dl}</dl>` : ""}${links}</article>`;
+  }).join("");
 }
 function renderItems(id) {
   const e = evById[id];
   $("#sheetTitle").textContent = fmtDate(e.date);
-  const list = ITEMS[id] || [], srcs = orderSrcs(SOURCES[id] || []);
-  const seqOf = Object.fromEntries(allPieces().filter(p => p.id === id).map(p => [p.i, p.seq]));
-  const embed = srcs.length ? srcEmbed(srcs[0]) : "";
+  const list = ITEMS[id] || [], srcs = SOURCES[id] || [];
   $("#sheetBody").innerHTML =
-    `<div class="item-head"><div class="type">${mark(e.type)}<span>${esc(TYPES[e.type].label)} · ${list.length} PCS</span></div><h3>${esc(e.title)}</h3>` +
-    `${embed ? `<div class="embed">${embed}</div>` : ""}${srcs.length ? `<div class="srcs">${srcs.map(srcLink).join("")}</div>` : ""}</div>` +
-    `<div class="sheet-tags">` + list.map((it, i) => {
+    `<div class="item-head"><div class="type">${mark(e.type)}${TYPES[e.type].label} · 아이템 ${list.length}개</div><h3>${esc(e.title)}</h3>${orderSrcs(srcs).map((s, i) => srcBlock(s, i === 0)).join("")}</div>` +
+    list.map((it, i) => {
       const url = safeUrl(it.url);
-      return `<article class="tag" data-i="${i}">
-        <span class="no">${CAT_PRE[it.cat] || "ETC"}-${pad3(seqOf[i] || 0)} · ${esc(CAT_CODE[it.cat] || it.cat)}</span>
-        <span class="br">${esc(it.brand || "—")}</span>
-        <span class="nm">${esc(it.name)}</span>
-        <span class="bc" aria-hidden="true"></span>
-        ${url ? `<a class="buy" href="${esc(url)}" target="_blank" rel="noopener"><span>BUY</span><span>↗</span></a>` : `<span class="buy none"><span>NO LINK</span><span>—</span></span>`}
+      return `<article class="item">
+        <div class="row"><span class="cat">${CAT_EMOJI[it.cat] || ""} ${esc(it.cat)}</span><span class="idx">${pad(i + 1)} / ${pad(list.length)}</span></div>
+        <div><p class="name">${esc(it.name)}</p><p class="brandname">${esc(it.brand)}</p></div>
+        ${url ? `<a class="buy" href="${esc(url)}" target="_blank" rel="noopener">구매 링크<svg viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a>` : `<div class="empty">구매 링크 정보 없음</div>`}
       </article>`;
-    }).join("") + `</div>`;
+    }).join("");
   hydrateEmbeds();
 }
 $("#sheetBody").addEventListener("click", ev => {
@@ -431,7 +400,7 @@ async function boot() {
       cur = new Date(+past.slice(0, 4), +past.slice(5, 7) - 1, 1);
     }
     $("#status").textContent = "";
-    renderLegend(); renderCal(); renderList();
+    renderCal(); renderList();
   } catch (err) {
     $("#status").textContent = "일정 데이터를 불러오지 못했어요. 잠시 후 새로고침해 주세요.";
   }
