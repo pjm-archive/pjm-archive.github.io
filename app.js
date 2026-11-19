@@ -189,7 +189,12 @@ function openDay(date) {
     let dl = "";
     if (e.place) dl += `<dt>장소</dt><dd>${esc(e.place)}</dd>`;
     if (e.desc) dl += `<dt>설명</dt><dd>${esc(e.desc)}</dd>`;
-    return `<article class="ev"><div class="type">${mark(e.type)}${TYPES[e.type].label}</div><h3>${title}</h3>${dl ? `<dl>${dl}</dl>` : ""}</article>`;
+    // 아이템이 없는 일정은 원본 링크를 상세에 바로 노출
+    const links = has ? "" : (SOURCES[e.id] || []).map(s => {
+      const url = safeUrl(s.url); if (!url) return "";
+      return `<a class="src" href="${esc(url)}" target="_blank" rel="noopener">${APP_ICON[s.platform] || ""}<span class="who"><b>원본 게시물 보기</b><small>${PLATFORM_LABEL[s.platform] || ""}${s.author ? " · " + esc(s.author) : ""}</small></span><svg class="ext" viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a>`;
+    }).join("");
+    return `<article class="ev"><div class="type">${mark(e.type)}${TYPES[e.type].label}</div><h3>${title}</h3>${dl ? `<dl>${dl}</dl>` : ""}${links}</article>`;
   }).join("");
   $("#sheetBody").scrollTop = 0;
   showSheet();
