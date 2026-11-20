@@ -62,7 +62,10 @@ main{padding-block:20px 32px}
 /* calendar */
 .extras{display:flex;gap:8px;align-items:stretch;margin-bottom:16px}
 .upnext{flex:1;min-width:0;display:flex;align-items:center;gap:8px;border:1px solid var(--line-strong);padding:9px 10px;text-align:left}
+.upnext{overflow:hidden}
 .upnext .col{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.upnext .col.roll{animation:rollin .35s ease}
+@keyframes rollin{from{opacity:0;transform:translateY(60%)}to{opacity:1;transform:none}}
 .upnext .lb{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.02em;white-space:nowrap}
 .upnext .tt{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .upnext .tt .mq{display:inline-block}
@@ -367,6 +370,6 @@ main{padding-block:20px 32px}
     <div class="sheet-body" id="sheetBody"></div>
   </div>
 </div>
-<script src="app.js?v=20261120-d1"></script>
+<script src="app.js?v=20261120-d2"></script>
 </body>
 </html>

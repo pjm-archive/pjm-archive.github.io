@@ -545,40 +545,65 @@ document.addEventListener("keydown", e => {
 });
 
 /* ---------- 다음 일정 배너 ---------- */
+// 배너: 예정 일정이 있으면 다음 일정(여러 개면 하나씩 롤링), 없으면 가장 최근 일정
+let upList = [], upIdx = 0, upTimer = null;
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 function renderUpnext() {
-  const today = ymd(TODAY), dates = Object.keys(byDate).sort();
-  // 예정 일정이 있으면 다음 일정, 없으면 가장 최근 일정을 같은 자리에
-  let d = dates.find(x => x >= today), label = "다음 일정", badge;
-  if (d) badge = dday(d);
-  else {
-    d = dates.filter(x => x < today).pop(); label = "최근 일정";
-    if (d) badge = `${Math.round((new Date(today + "T00:00") - new Date(d + "T00:00")) / 864e5)}일 전`;
+  const today = ymd(TODAY);
+  clearTimeout(upTimer);
+  upList = EVENTS.filter(e => e.date >= today).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  if (!upList.length) {
+    const past = EVENTS.filter(e => e.date < today).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+    const last = past.at(-1);
+    upList = last ? past.filter(e => e.date === last.date) : [];
+    upList.past = true;
   }
+  upIdx = 0;
   const el = $("#upnext");
-  if (!d) { el.hidden = true; return; }
-  const evs = byDate[d];
+  if (!upList.length) { el.hidden = true; return; }
   el.hidden = false;
-  el.dataset.date = d;
-  el.classList.toggle("past", label === "최근 일정");
-  el.innerHTML = `<span class="col"><span class="lb">${label} · ${d.slice(5).replace("-", ".")} ${DOW[new Date(d + "T00:00").getDay()]}${evs.length > 1 ? ` · 외 ${evs.length - 1}건` : ""}</span><span class="tt"><span class="mq">${esc(evs[0].title)}</span></span></span><b class="dd">${badge}</b>`;
-  requestAnimationFrame(marquee);
-  el.setAttribute("aria-label", `${label} ${fmtDate(d)} ${evs[0].title}${evs.length > 1 ? ` 외 ${evs.length - 1}건` : ""}, ${badge}`);
+  el.classList.toggle("past", !!upList.past);
+  showUp(false);
 }
-// 제목이 칸보다 길면 옆으로 흐르게 (같은 글을 이어 붙여서 끊김 없이 반복)
+function showUp(animate) {
+  const el = $("#upnext"), e = upList[upIdx], d = e.date, today = ymd(TODAY);
+  const past = !!upList.past;
+  const badge = past ? `${Math.round((new Date(today + "T00:00") - new Date(d + "T00:00")) / 864e5)}일 전` : dday(d);
+  const rolling = !past && upList.length > 1 && !reduceMotion();
+  // 롤링하면 "1/3", 롤링 안 하면(지난 일정·동작 줄이기) 같은 날 다른 일정 수를 "외 n건"으로
+  const sameDay = upList.filter(x => x.date === d).length;
+  const extra = rolling ? ` · ${upIdx + 1}/${upList.length}` : (!past && upList.length > 1 ? ` · 외 ${upList.length - 1}건` : (sameDay > 1 ? ` · 외 ${sameDay - 1}건` : ""));
+  el.dataset.date = d;
+  el.innerHTML = `<span class="col${animate ? " roll" : ""}"><span class="lb">${past ? "최근 일정" : "다음 일정"} · ${d.slice(5).replace("-", ".")} ${DOW[new Date(d + "T00:00").getDay()]}${extra}</span><span class="tt"><span class="mq">${esc(e.title)}</span></span></span><b class="dd">${badge}</b>`;
+  el.setAttribute("aria-label", `${past ? "최근 일정" : "다음 일정"} ${fmtDate(d)} ${e.title}, ${badge}`);
+  requestAnimationFrame(() => {
+    const dur = marquee();   // 흐르는 제목이면 한 바퀴 걸리는 시간(초)
+    if (!rolling) return;
+    clearTimeout(upTimer);
+    upTimer = setTimeout(() => { upIdx = (upIdx + 1) % upList.length; showUp(true); }, (dur ? dur + 1.6 : 4.5) * 1000);
+  });
+}
+// 제목이 칸보다 길면 옆으로 흐르게 (같은 글을 이어 붙여서 끊김 없이 반복). 한 바퀴 시간(초)을 돌려줌
 function marquee() {
-  const box = $("#upnext .tt"), mq = box?.querySelector(".mq"); if (!mq) return;
+  const box = $("#upnext .tt"), mq = box?.querySelector(".mq"); if (!mq) return 0;
   const text = mq.dataset.t ?? mq.textContent; mq.dataset.t = text;
   mq.textContent = text; box.classList.remove("flow");
   const w = mq.offsetWidth;
-  if (w <= box.clientWidth + 1 || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const gap = 40;
+  if (w <= box.clientWidth + 1 || reduceMotion()) return 0;
+  const gap = 40, dur = Math.max(6, (w + gap) / 32);   // 초당 약 32px
   mq.innerHTML = `<span>${esc(text)}</span><span aria-hidden="true" style="padding-left:${gap}px">${esc(text)}</span>`;
   mq.style.setProperty("--dist", `-${w + gap}px`);
-  mq.style.setProperty("--dur", `${Math.max(6, (w + gap) / 32)}s`);   // 초당 약 32px
+  mq.style.setProperty("--dur", `${dur}s`);
   box.classList.add("flow");
+  return dur;
 }
 addEventListener("resize", () => requestAnimationFrame(marquee));
 document.fonts?.ready.then(marquee);
+// 탭이 안 보일 때는 롤링 멈춤
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) clearTimeout(upTimer);
+  else if (upList.length > 1 && !upList.past) showUp(false);
+});
 $("#upnext").addEventListener("click", () => {
   const d = $("#upnext").dataset.date; if (!d) return;
   track(`배너 · ${$("#upnext").classList.contains("past") ? "최근 일정" : "다음 일정"}`);
