@@ -318,11 +318,13 @@ const SRC_ORDER = { youtube: 0, instagram: 1, x: 2 };
 const orderSrcs = list => [...list].sort((a, b) => (SRC_ORDER[a.platform] ?? 9) - (SRC_ORDER[b.platform] ?? 9));
 function srcBlock(s, withEmbed = true) {
   const url = safeUrl(s.url); if (!url) return "";
-  const link = `<a class="src" href="${esc(url)}" target="_blank" rel="noopener">${APP_ICON[s.platform] || ""}<span class="who"><b>${s.platform === "audio" ? "원본 파일 열기" : "원본 게시물 보기"}</b><small>${PLATFORM_LABEL[s.platform] || ""} · ${esc(s.author)}</small></span><svg class="ext" viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a>`;
+  const link = `<a class="src" href="${esc(url)}" target="_blank" rel="noopener">${APP_ICON[s.platform] || ""}<span class="who"><b>${s.platform === "audio" ? "원본 파일 열기" : /instagram\.com\/(s|stories)\//.test(url) ? "스토리 보기" : "원본 게시물 보기"}</b><small>${PLATFORM_LABEL[s.platform] || ""} · ${esc(s.author)}</small></span><svg class="ext" viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a>`;
   let embed = "";
   if (s.platform === "x") {
     const tw = url.replace(/^https?:\/\/(www\.)?x\.com/, "https://twitter.com").split("?")[0];
     embed = `<blockquote class="twitter-tweet" data-dnt="true"><a href="${esc(tw)}"></a></blockquote>`;
+  } else if (s.platform === "instagram" && /instagram\.com\/(s|stories)\//.test(url)) {
+    embed = "";   // 스토리·하이라이트는 인스타그램이 퍼가기를 지원하지 않아 링크로만
   } else if (s.platform === "instagram") {
     embed = `<blockquote class="instagram-media" data-instgrm-permalink="${esc(url.split("?")[0])}" data-instgrm-version="14" style="margin:0;min-width:0;width:100%"></blockquote>`;
   } else if (s.platform === "audio") {
