@@ -11,12 +11,13 @@ const TYPES = {
   book:      { label: "북토크",   chip: "북토크", cls: "book" },
   tv:        { label: "방송",     chip: "방송",   cls: "tv" },
   concert:   { label: "콘서트",   chip: "콘서트", cls: "etc" },
+  release:   { label: "개봉",     chip: "개봉",   cls: "rel" },
   fancafe:   { label: "팬카페",   kind: "app" },
   blog:      { label: "블로그",   kind: "app" }
 };
-const TYPE_BY_LABEL = { "유튜브":"youtube", "인스타그램":"instagram", "GV":"gv", "무대인사":"muin", "북토크":"book", "방송":"tv", "콘서트":"concert", "팬카페":"fancafe", "블로그":"blog" };
-const PLATFORM_BY_LABEL = { "X":"x", "인스타그램":"instagram", "유튜브":"youtube", "네이버 카페":"cafe", "네이버 블로그":"blog" };
-const PLATFORM_LABEL = { x:"X", instagram:"인스타그램", youtube:"유튜브", cafe:"네이버 카페", blog:"네이버 블로그" };
+const TYPE_BY_LABEL = { "유튜브":"youtube", "인스타그램":"instagram", "GV":"gv", "무대인사":"muin", "북토크":"book", "방송":"tv", "콘서트":"concert", "팬카페":"fancafe", "블로그":"blog", "개봉":"release" };
+const PLATFORM_BY_LABEL = { "X":"x", "인스타그램":"instagram", "유튜브":"youtube", "네이버 카페":"cafe", "네이버 블로그":"blog", "오디오":"audio" };
+const PLATFORM_LABEL = { x:"X", instagram:"인스타그램", youtube:"유튜브", cafe:"네이버 카페", blog:"네이버 블로그", audio:"오디오" };
 const CAT_EMOJI = { "아우터":"🧥", "상의":"👕", "하의":"👖", "신발":"👟", "잡화":"👜", "기타":"✨" };
 
 const APP_ICON = {
@@ -307,13 +308,15 @@ const SRC_ORDER = { youtube: 0, instagram: 1, x: 2 };
 const orderSrcs = list => [...list].sort((a, b) => (SRC_ORDER[a.platform] ?? 9) - (SRC_ORDER[b.platform] ?? 9));
 function srcBlock(s, withEmbed = true) {
   const url = safeUrl(s.url); if (!url) return "";
-  const link = `<a class="src" href="${esc(url)}" target="_blank" rel="noopener">${APP_ICON[s.platform] || ""}<span class="who"><b>원본 게시물 보기</b><small>${PLATFORM_LABEL[s.platform] || ""} · ${esc(s.author)}</small></span><svg class="ext" viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a>`;
+  const link = `<a class="src" href="${esc(url)}" target="_blank" rel="noopener">${APP_ICON[s.platform] || ""}<span class="who"><b>${s.platform === "audio" ? "원본 파일 열기" : "원본 게시물 보기"}</b><small>${PLATFORM_LABEL[s.platform] || ""} · ${esc(s.author)}</small></span><svg class="ext" viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a>`;
   let embed = "";
   if (s.platform === "x") {
     const tw = url.replace(/^https?:\/\/(www\.)?x\.com/, "https://twitter.com").split("?")[0];
     embed = `<blockquote class="twitter-tweet" data-dnt="true"><a href="${esc(tw)}"></a></blockquote>`;
   } else if (s.platform === "instagram") {
     embed = `<blockquote class="instagram-media" data-instgrm-permalink="${esc(url.split("?")[0])}" data-instgrm-version="14" style="margin:0;min-width:0;width:100%"></blockquote>`;
+  } else if (s.platform === "audio") {
+    embed = `<audio controls preload="none" src="${esc(url)}" style="width:100%"></audio>`;   // 라디오 다시듣기 등
   } else if (s.platform === "youtube" && ytId(url)) {
     embed = `<iframe src="https://www.youtube-nocookie.com/embed/${ytId(url)}" title="유튜브 영상" loading="lazy" allowfullscreen></iframe>`;
   }
@@ -410,7 +413,7 @@ function dday(date) {
   const diff = Math.round((new Date(date + "T00:00") - new Date(ymd(TODAY) + "T00:00")) / 864e5);
   return diff === 0 ? "오늘" : diff > 0 ? `D-${diff}` : "";
 }
-const SRC_HINT = { youtube: "영상", instagram: "게시물", x: "게시물", cafe: "카페 글", blog: "블로그 글" };
+const SRC_HINT = { youtube: "영상", instagram: "게시물", x: "게시물", cafe: "카페 글", blog: "블로그 글", audio: "다시듣기" };
 function renderDay(date) {
   $("#sheetTitle").textContent = fmtDate(date);
   const dd = dday(date);
