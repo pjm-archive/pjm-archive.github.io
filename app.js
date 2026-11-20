@@ -1,3 +1,9 @@
+/* ---------- 방문 통계 (GoatCounter, 쿠키 없음) ---------- */
+// 이벤트 이름은 대시보드에서 바로 읽히게 한글로. 스크립트가 아직 안 떴거나 막혀 있으면 조용히 넘어감
+function track(name) {
+  try { window.goatcounter?.count?.({ path: name.slice(0, 200), title: name.slice(0, 200), event: true }); } catch (e) {}
+}
+
 /* 데이터 소스: 구글 시트 (링크가 있는 모든 사용자 보기 권한 필요) */
 const SHEET_ID = "1grh6Fgcdro-318wagpvrZYaXj7u9OLxEupDwSTikbgk";
 const csvUrl = tab => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(tab)}`;
@@ -79,6 +85,7 @@ let EVENTS = [], ITEMS = {}, SOURCES = {}, evById = {}, byDate = {};
 
 /* ---------- 탭 ---------- */
 document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => {
+  if (b.getAttribute("aria-selected") !== "true") track(`탭 · ${b.textContent.trim()}`);
   document.querySelectorAll("nav button").forEach(x => x.setAttribute("aria-selected", x === b));
   $("#view-cal").hidden = b.dataset.view !== "cal";
   $("#view-items").hidden = b.dataset.view !== "items";
@@ -164,6 +171,7 @@ function renderPeriodPanel() {
 function setPeriod(p) {
   if (p.from && p.to && p.from > p.to) [p.from, p.to] = [p.to, p.from];
   period = p; store.set("pjm-period", JSON.stringify(period)); renderList();
+  if (p.from || p.to) track(`필터 · 기간 ${periodLabel()}`);
 }
 
 // 같은 옷을 여러 번 입으면 하나로 묶는다. 기준: 구매 링크가 같거나, 링크가 없으면 브랜드+이름이 같을 때
@@ -220,6 +228,7 @@ function renderBrandBtn() {
   $("#brandClear").hidden = !brandFilter;
 }
 function setBrand(b) {
+  if (b) track(`필터 · 브랜드 ${b}`);
   brandFilter = b; store.set("pjm-brand", b);
   $("#brandPanel").hidden = true; $("#brandBtn").setAttribute("aria-expanded", false);
   renderList();
@@ -268,6 +277,7 @@ $("#view-items").addEventListener("click", e => {
 $("#catBar").addEventListener("click", e => {
   const b = e.target.closest("button[data-cat]"); if (!b || b.disabled) return;
   catFilter = b.dataset.cat; store.set("pjm-cat", catFilter); renderList();
+  if (catFilter) track(`필터 · 카테고리 ${catFilter}`);
 });
 // 기간·브랜드 패널은 하나만 열리게
 function togglePanel(name) {
@@ -355,7 +365,7 @@ function navList(view) {
   return view.scope ? view.scope.filter(k => GROUPS[k]) : Object.keys(GROUPS).sort(byLatest);
 }
 const viewKey = v => v.v === "day" ? v.date : v.v === "event" ? v.id : v.key;
-function render(view, dir = 0) {
+function render(view, dir = 0, log = true) {
   const list = navList(view), i = list.indexOf(viewKey(view));
   $("#prevS").disabled = i <= 0;
   $("#nextS").disabled = i < 0 || i >= list.length - 1;
@@ -364,6 +374,10 @@ function render(view, dir = 0) {
   if (view.v === "day") renderDay(view.date);
   else if (view.v === "event") renderEvent(view.id, view.random);
   else renderItem(view.key);
+  if (log) {   // 뒤로가기로 다시 그릴 때는 세지 않음
+    if (view.v === "event") track(`일정 · ${evById[view.id]?.title || view.id}`);
+    else if (view.v === "item") { const it = GROUPS[view.key]?.it; if (it) track(`아이템 · ${it.brand || ""} ${it.name}`.trim()); }
+  }
   const body = $("#sheetBody");
   body.scrollTop = 0;
   body.classList.remove("in-l", "in-r");
@@ -392,6 +406,7 @@ function pickRandom(except) {
 }
 function openRandom() { const id = pickRandom(); if (id) { stack = []; push({ v: "event", id, random: true }); } }
 function reroll() {
+  track("랜덤 · 다시 뽑기");
   const view = stack[stack.length - 1], id = pickRandom(view?.id); if (!id) return;
   stack[stack.length - 1] = { ...view, id, random: true };
   render(stack[stack.length - 1], 1);
@@ -405,7 +420,7 @@ addEventListener("popstate", e => {
   const d = e.state?.pjm || 0;
   if (d >= stack.length) return;
   stack.length = d;
-  if (!d) hideSheet(); else render(stack[d - 1]);
+  if (!d) hideSheet(); else render(stack[d - 1], 0, false);
 });
 
 // 오늘 기준 D-day ("오늘", "D-3", 지난 날은 빈 값)
@@ -508,6 +523,7 @@ function gSync() {
   $("#gPrev").disabled = i <= 0; $("#gNext").disabled = i >= gN - 1;
 }
 function openGuide() {
+  track("이용 안내 열기");
   $("#guide").hidden = false; document.body.style.overflow = "hidden";
   gTrack.scrollLeft = 0; gSync();
   history.pushState({ guide: 1 }, "");
@@ -565,10 +581,11 @@ addEventListener("resize", () => requestAnimationFrame(marquee));
 document.fonts?.ready.then(marquee);
 $("#upnext").addEventListener("click", () => {
   const d = $("#upnext").dataset.date; if (!d) return;
+  track(`배너 · ${$("#upnext").classList.contains("past") ? "최근 일정" : "다음 일정"}`);
   cur = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, 1); renderCal();
   openDay(d);
 });
-$("#randomBtn").addEventListener("click", openRandom);
+$("#randomBtn").addEventListener("click", () => { track("랜덤 · 아무 날 보기"); openRandom(); });
 
 /* ---------- 부팅 ---------- */
 async function boot() {
@@ -601,3 +618,12 @@ async function boot() {
 }
 boot();
 try { if (localStorage.getItem("pjm-tab") === "items") $("#tab-items").click(); } catch (e) {}
+
+// 바깥으로 나가는 링크: 구매 링크, 원본 게시물
+document.addEventListener("click", e => {
+  const a = e.target.closest("a.buy, a.src"); if (!a) return;
+  if (a.classList.contains("buy")) {
+    const it = GROUPS[stack.at(-1)?.key]?.it;
+    track(`구매 링크 · ${it ? `${it.brand || ""} ${it.name}`.trim() : a.href}`);
+  } else track(`원본 링크 · ${a.querySelector("small")?.textContent.split("·")[0].trim() || "기타"}`);
+}, true);
