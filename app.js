@@ -523,15 +523,22 @@ document.addEventListener("keydown", e => {
 
 /* ---------- 다음 일정 배너 ---------- */
 function renderUpnext() {
-  const today = ymd(TODAY);
-  const next = Object.keys(byDate).filter(d => d >= today).sort()[0];
+  const today = ymd(TODAY), dates = Object.keys(byDate).sort();
+  // 예정 일정이 있으면 다음 일정, 없으면 가장 최근 일정을 같은 자리에
+  let d = dates.find(x => x >= today), label = "다음 일정", badge;
+  if (d) badge = dday(d);
+  else {
+    d = dates.filter(x => x < today).pop(); label = "최근 일정";
+    if (d) badge = `${Math.round((new Date(today + "T00:00") - new Date(d + "T00:00")) / 864e5)}일 전`;
+  }
   const el = $("#upnext");
-  if (!next) { el.hidden = true; return; }
-  const evs = byDate[next];
+  if (!d) { el.hidden = true; return; }
+  const evs = byDate[d];
   el.hidden = false;
-  el.dataset.date = next;
-  el.innerHTML = `<span class="col"><span class="lb">다음 일정 · ${next.slice(5).replace("-", ".")} ${DOW[new Date(next + "T00:00").getDay()]}${evs.length > 1 ? ` · 외 ${evs.length - 1}건` : ""}</span><span class="tt">${esc(evs[0].title)}</span></span><b class="dd">${dday(next)}</b>`;
-  el.setAttribute("aria-label", `다음 일정 ${fmtDate(next)} ${evs[0].title}${evs.length > 1 ? ` 외 ${evs.length - 1}건` : ""}, ${dday(next)}`);
+  el.dataset.date = d;
+  el.classList.toggle("past", label === "최근 일정");
+  el.innerHTML = `<span class="col"><span class="lb">${label} · ${d.slice(5).replace("-", ".")} ${DOW[new Date(d + "T00:00").getDay()]}${evs.length > 1 ? ` · 외 ${evs.length - 1}건` : ""}</span><span class="tt">${esc(evs[0].title)}</span></span><b class="dd">${badge}</b>`;
+  el.setAttribute("aria-label", `${label} ${fmtDate(d)} ${evs[0].title}${evs.length > 1 ? ` 외 ${evs.length - 1}건` : ""}, ${badge}`);
 }
 $("#upnext").addEventListener("click", () => {
   const d = $("#upnext").dataset.date; if (!d) return;
