@@ -537,9 +537,25 @@ function renderUpnext() {
   el.hidden = false;
   el.dataset.date = d;
   el.classList.toggle("past", label === "최근 일정");
-  el.innerHTML = `<span class="col"><span class="lb">${label} · ${d.slice(5).replace("-", ".")} ${DOW[new Date(d + "T00:00").getDay()]}${evs.length > 1 ? ` · 외 ${evs.length - 1}건` : ""}</span><span class="tt">${esc(evs[0].title)}</span></span><b class="dd">${badge}</b>`;
+  el.innerHTML = `<span class="col"><span class="lb">${label} · ${d.slice(5).replace("-", ".")} ${DOW[new Date(d + "T00:00").getDay()]}${evs.length > 1 ? ` · 외 ${evs.length - 1}건` : ""}</span><span class="tt"><span class="mq">${esc(evs[0].title)}</span></span></span><b class="dd">${badge}</b>`;
+  requestAnimationFrame(marquee);
   el.setAttribute("aria-label", `${label} ${fmtDate(d)} ${evs[0].title}${evs.length > 1 ? ` 외 ${evs.length - 1}건` : ""}, ${badge}`);
 }
+// 제목이 칸보다 길면 옆으로 흐르게 (같은 글을 이어 붙여서 끊김 없이 반복)
+function marquee() {
+  const box = $("#upnext .tt"), mq = box?.querySelector(".mq"); if (!mq) return;
+  const text = mq.dataset.t ?? mq.textContent; mq.dataset.t = text;
+  mq.textContent = text; box.classList.remove("flow");
+  const w = mq.offsetWidth;
+  if (w <= box.clientWidth + 1 || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const gap = 40;
+  mq.innerHTML = `<span>${esc(text)}</span><span aria-hidden="true" style="padding-left:${gap}px">${esc(text)}</span>`;
+  mq.style.setProperty("--dist", `-${w + gap}px`);
+  mq.style.setProperty("--dur", `${Math.max(6, (w + gap) / 32)}s`);   // 초당 약 32px
+  box.classList.add("flow");
+}
+addEventListener("resize", () => requestAnimationFrame(marquee));
+document.fonts?.ready.then(marquee);
 $("#upnext").addEventListener("click", () => {
   const d = $("#upnext").dataset.date; if (!d) return;
   cur = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, 1); renderCal();
