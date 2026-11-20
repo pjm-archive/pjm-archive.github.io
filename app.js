@@ -291,6 +291,10 @@ $("#sortSel").addEventListener("change", () => { sortDir = $("#sortSel").value; 
 const syncHeader = () => document.documentElement.style.setProperty("--hdr", $("header").offsetHeight + "px");
 addEventListener("resize", syncHeader); syncHeader();
 document.fonts?.ready.then(syncHeader);   // 웹폰트 로딩 후 높이가 바뀔 수 있어서
+if (window.ResizeObserver) new ResizeObserver(syncHeader).observe($("header"));   // 헤더 높이가 바뀌면 언제든 다시 맞춤
+// 새로고침 때 브라우저가 이전 스크롤 위치를 되살리면 데이터가 늦게 그려지면서 배너가 헤더 밑으로 밀려 들어가서, 항상 맨 위에서 시작
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+scrollTo(0, 0);
 
 /* ---------- 원본 게시물 임베드 ---------- */
 const loaded = {};
