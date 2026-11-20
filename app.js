@@ -355,7 +355,7 @@ function render(view, dir = 0) {
   $("#sheetPos").textContent = i >= 0 && list.length > 1 ? `${i + 1} / ${list.length}` : "";
   $("#back").style.visibility = stack.length < 2 ? "hidden" : "visible";   // 자리는 유지해서 제목이 가운데 오게
   if (view.v === "day") renderDay(view.date);
-  else if (view.v === "event") renderEvent(view.id);
+  else if (view.v === "event") renderEvent(view.id, view.random);
   else renderItem(view.key);
   const body = $("#sheetBody");
   body.scrollTop = 0;
@@ -371,13 +371,24 @@ function go(dir) {
   const view = stack[stack.length - 1]; if (!view) return;
   const list = navList(view), j = list.indexOf(viewKey(view)) + dir;
   if (j < 0 || j >= list.length) return;
-  const next = view.v === "day" ? { ...view, date: list[j] } : view.v === "event" ? { ...view, id: list[j] } : { ...view, key: list[j] };
+  const next = view.v === "day" ? { ...view, date: list[j] } : view.v === "event" ? { ...view, id: list[j], random: false } : { ...view, key: list[j] };
   stack[stack.length - 1] = next;
   render(next, dir);
   if (next.v === "day") { const d = next.date; const m = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, 1); if (m.getTime() !== cur.getTime()) { cur = m; renderCal(); } }
 }
 function openDay(date) { stack = []; push({ v: "day", date }); }
 function openEvent(id) { push({ v: "event", id }); }
+/* ---------- 랜덤 일정 ---------- */
+function pickRandom(except) {
+  const pool = contentIds().filter(id => id !== except && evById[id].date <= ymd(TODAY));
+  return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+}
+function openRandom() { const id = pickRandom(); if (id) { stack = []; push({ v: "event", id, random: true }); } }
+function reroll() {
+  const view = stack[stack.length - 1], id = pickRandom(view?.id); if (!id) return;
+  stack[stack.length - 1] = { ...view, id, random: true };
+  render(stack[stack.length - 1], 1);
+}
 function openItem(key, scope) {
   if (scope) { stack = []; push({ v: "item", key, scope }); }   // 아이템 탭에서: 지금 걸린 필터 결과 안에서 넘기기
   else push({ v: "item", key });                                 // 일정 상세에서: 전체 아이템을 날짜순으로
@@ -390,10 +401,16 @@ addEventListener("popstate", e => {
   if (!d) hideSheet(); else render(stack[d - 1]);
 });
 
+// 오늘 기준 D-day ("오늘", "D-3", 지난 날은 빈 값)
+function dday(date) {
+  const diff = Math.round((new Date(date + "T00:00") - new Date(ymd(TODAY) + "T00:00")) / 864e5);
+  return diff === 0 ? "오늘" : diff > 0 ? `D-${diff}` : "";
+}
 const SRC_HINT = { youtube: "영상", instagram: "게시물", x: "게시물", cafe: "카페 글", blog: "블로그 글" };
 function renderDay(date) {
   $("#sheetTitle").textContent = fmtDate(date);
-  $("#sheetBody").innerHTML = (byDate[date] || []).map(e => {
+  const dd = dday(date);
+  $("#sheetBody").innerHTML = (dd ? `<p class="soon"><b>${dd}</b>${dd === "오늘" ? "오늘 있는 일정이에요" : "예정된 일정이에요"}</p>` : "") + (byDate[date] || []).map(e => {
     const n = ITEMS[e.id]?.length || 0, srcs = orderSrcs(SOURCES[e.id] || []);
     const title = hasContent(e.id)
       ? `<button data-ev="${esc(e.id)}">${esc(e.title)}<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>`
@@ -405,13 +422,14 @@ function renderDay(date) {
     return `<article class="ev"><div class="type">${mark(e.type)}${TYPES[e.type].label}</div><h3>${title}</h3>${dl ? `<dl>${dl}</dl>` : ""}${hints.trim() ? `<div class="hints">${hints}</div>` : ""}</article>`;
   }).join("");
 }
-function renderEvent(id) {
+function renderEvent(id, random = false) {
   const e = evById[id], list = ITEMS[id] || [], srcs = orderSrcs(SOURCES[id] || []);
   $("#sheetTitle").textContent = fmtDate(e.date);
   let dl = "";
   if (e.place) dl += `<dt>장소</dt><dd>${esc(e.place)}</dd>`;
   if (e.desc) dl += `<dt>설명</dt><dd>${esc(e.desc)}</dd>`;
   $("#sheetBody").innerHTML =
+    (random ? `<div class="randbar"><span>🎲 랜덤으로 고른 일정</span><button id="reroll">다시 뽑기</button></div>` : "") +
     `<div class="item-head"><div class="type">${mark(e.type)}${TYPES[e.type].label}</div><h3>${esc(e.title)}</h3>${dl ? `<dl class="evmeta">${dl}</dl>` : ""}` +
     srcs.map((s, i) => srcBlock(s, i === 0)).join("") + `</div>` +
     (list.length ? `<h4 class="sec">착용 아이템 <span>${list.length}</span></h4><div class="prows">` +
@@ -433,6 +451,7 @@ function renderItem(key) {
     </div>`;
 }
 $("#sheetBody").addEventListener("click", ev => {
+  if (ev.target.closest("#reroll")) return reroll();
   const e = ev.target.closest("button[data-ev]"); if (e) return openEvent(e.dataset.ev);
   const k = ev.target.closest("button[data-key]"); if (k) return openItem(k.dataset.key);
 });
@@ -502,6 +521,25 @@ document.addEventListener("keydown", e => {
   else if (e.key === "ArrowRight") $("#gNext").click();
 });
 
+/* ---------- 다음 일정 배너 ---------- */
+function renderUpnext() {
+  const today = ymd(TODAY);
+  const next = Object.keys(byDate).filter(d => d >= today).sort()[0];
+  const el = $("#upnext");
+  if (!next) { el.hidden = true; return; }
+  const evs = byDate[next];
+  el.hidden = false;
+  el.dataset.date = next;
+  el.innerHTML = `<span class="col"><span class="lb">다음 일정 · ${next.slice(5).replace("-", ".")} ${DOW[new Date(next + "T00:00").getDay()]}${evs.length > 1 ? ` · 외 ${evs.length - 1}건` : ""}</span><span class="tt">${esc(evs[0].title)}</span></span><b class="dd">${dday(next)}</b>`;
+  el.setAttribute("aria-label", `다음 일정 ${fmtDate(next)} ${evs[0].title}${evs.length > 1 ? ` 외 ${evs.length - 1}건` : ""}, ${dday(next)}`);
+}
+$("#upnext").addEventListener("click", () => {
+  const d = $("#upnext").dataset.date; if (!d) return;
+  cur = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, 1); renderCal();
+  openDay(d);
+});
+$("#randomBtn").addEventListener("click", openRandom);
+
 /* ---------- 부팅 ---------- */
 async function boot() {
   renderCal(); renderList();
@@ -526,7 +564,7 @@ async function boot() {
       cur = new Date(+past.slice(0, 4), +past.slice(5, 7) - 1, 1);
     }
     $("#status").textContent = "";
-    buildGroups(); renderCal(); renderList();
+    buildGroups(); renderCal(); renderList(); renderUpnext();
   } catch (err) {
     $("#status").textContent = "일정 데이터를 불러오지 못했어요. 잠시 후 새로고침해 주세요.";
   }
