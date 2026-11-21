@@ -199,7 +199,7 @@ const CATS = ["아우터", "상의", "하의", "신발", "잡화", "기타"];
 const BRAND_ALIAS = {
   "carhartt wip": "칼하트", "prada": "프라다", "pilot": "파이롯트 파일럿", "dickies": "디키즈", "espionage": "에스피오나지",
   "nonymousaa": "넌이머스 논이머스", "kodak": "코닥", "seed": "씨드", "ito-ya": "이토야", "blue elephant": "블루엘리펀트",
-  "b-side label": "비사이드라벨", "sylian rail": "실리안레일", "the loose company": "더루즈컴퍼니 루즈컴퍼니", "르무통": "le mouton lemouton"
+  "b-side label": "비사이드라벨", "sylian rail": "실리안레일", "the loose company": "더루즈컴퍼니 루즈컴퍼니", "르무통": "le mouton lemouton", "solid homme": "솔리드옴므 솔리드옴무 솔리드"
 };
 const brandMatch = (b, q) => !q || (b + " " + (BRAND_ALIAS[b.toLowerCase()] || "")).toLowerCase().replace(/\s/g, "").includes(q.toLowerCase().replace(/\s/g, ""));
 
