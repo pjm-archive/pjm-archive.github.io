@@ -318,7 +318,7 @@ const SRC_ORDER = { youtube: 0, instagram: 1, x: 2 };
 const orderSrcs = list => [...list].sort((a, b) => (SRC_ORDER[a.platform] ?? 9) - (SRC_ORDER[b.platform] ?? 9));
 function srcBlock(s, withEmbed = true) {
   const url = safeUrl(s.url); if (!url) return "";
-  const link = `<a class="src" href="${esc(url)}" target="_blank" rel="noopener">${APP_ICON[s.platform] || ""}<span class="who"><b>${s.platform === "audio" ? "원본 파일 열기" : /instagram\.com\/(s|stories)\//.test(url) ? "스토리 보기" : "원본 게시물 보기"}</b><small>${PLATFORM_LABEL[s.platform] || ""} · ${esc(s.author)}</small></span><svg class="ext" viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a>`;
+  const link = `<a class="src" href="${esc(url)}" target="_blank" rel="noopener">${APP_ICON[s.platform] || ""}<span class="who"><b>${s.title ? esc(s.title) : s.platform === "audio" ? "원본 파일 열기" : /instagram\.com\/(s|stories)\//.test(url) ? "스토리 보기" : "원본 게시물 보기"}</b><small>${PLATFORM_LABEL[s.platform] || ""} · ${esc(s.author)}</small></span><svg class="ext" viewBox="0 0 16 16"><path d="M6 3h7v7M13 3 4 12"/></svg></a>`;
   let embed = "";
   if (s.platform === "x") {
     const tw = url.replace(/^https?:\/\/(www\.)?x\.com/, "https://twitter.com").split("?")[0];
@@ -630,7 +630,7 @@ async function boot() {
       .forEach(r => (ITEMS[r["행사ID"]] ??= []).push({ cat: r["카테고리"], name: r["아이템명"], brand: r["브랜드"], url: r["구매링크"], img: r["이미지"] }));
     SOURCES = {};
     sr.filter(r => evById[r["행사ID"]])
-      .forEach(r => (SOURCES[r["행사ID"]] ??= []).push({ platform: PLATFORM_BY_LABEL[r["플랫폼"]], author: r["계정"], url: r["원본URL"] }));
+      .forEach(r => (SOURCES[r["행사ID"]] ??= []).push({ platform: PLATFORM_BY_LABEL[r["플랫폼"]], author: r["계정"], url: r["원본URL"], title: (r["제목"] || "").trim() }));
     // 이번 달에 일정이 없으면 가장 최근 일정이 있는 달로
     const thisMonth = ymd(cur).slice(0, 7);
     if (!EVENTS.some(e => e.date.startsWith(thisMonth)) && EVENTS.length) {
