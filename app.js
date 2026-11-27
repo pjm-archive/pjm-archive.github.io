@@ -139,14 +139,6 @@ function stepMonth(dir) {
   const m = dir > 0 ? ms.find(x => x > now) : ms.filter(x => x < now).pop();
   if (m) { setCur(m); renderCal(); renderQres(); }
 }
-// 날짜로 읽히는 검색어: 11/13 · 11.13 · 11월 13일 · 2026.11 · 2026-11-13 · 11월
-function dateToken(t) {
-  let m;
-  if ((m = t.match(/^(\d{4})[.\-/년]\s*(\d{1,2})[.\-/월]?\s*(?:(\d{1,2})일?)?\.?$/))) return d => d.startsWith(`${m[1]}-${pad(m[2])}`) && (!m[3] || d.endsWith(`-${pad(m[3])}`));
-  if ((m = t.match(/^(\d{1,2})[./월]\s*(\d{1,2})일?\.?$/))) return d => d.slice(5) === `${pad(m[1])}-${pad(m[2])}`;
-  if ((m = t.match(/^(\d{1,2})월$/))) return d => d.slice(5, 7) === pad(m[1]);
-  return null;
-}
 const norm = s => String(s || "").toLowerCase().replace(/\s+/g, "");
 let HAY = {};   // 행사ID → 검색용 문자열
 function buildHay() {
@@ -163,7 +155,7 @@ function search(q) {
   if (!toks.length) return null;
   // 붙여 쓴 전체 문구도 한 번 맞춰본다 ("솔리드 옴므" → "솔리드옴므")
   const whole = norm(q);
-  const tests = toks.map(t => { const dt = dateToken(t); return dt ? e => dt(e.date) : e => HAY[e.id].includes(norm(t)); });
+  const tests = toks.map(t => e => HAY[e.id].includes(norm(t)));
   return new Set(EVENTS.filter(e => tests.every(f => f(e)) || (toks.length > 1 && HAY[e.id].includes(whole))).map(e => e.id));
 }
 function renderQres() {
