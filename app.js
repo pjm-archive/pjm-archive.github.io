@@ -103,7 +103,7 @@ function renderCal() {
   let html = "";
   for (let i = 0; i < cells; i++) {
     const d = new Date(start); d.setDate(start.getDate() + i);
-    const k = ymd(d), evs = byDate[k] || [], out = d.getMonth() !== cur.getMonth();
+    const k = ymd(d), evs = dayEvents(k), out = d.getMonth() !== cur.getMonth();
     const cls = ["day", out && "out", k === ymd(TODAY) && "today", evs.length && "has"].filter(Boolean).join(" ");
     // 같은 종류는 아이콘 하나 + 개수로 묶기
     const groups = [];
@@ -116,10 +116,81 @@ function renderCal() {
       : `<div class="${cls}"><span class="n">${d.getDate()}</span></div>`;
   }
   $("#grid").innerHTML = html;
+  // 검색 중엔 결과가 있는 달로만 넘어가므로, 더 갈 곳이 없으면 화살표를 끈다
+  const ms = HITS ? Object.keys(hitMonths()).sort() : null, now = curYm();
+  $("#prev").disabled = !!ms && !ms.some(m => m < now);
+  $("#next").disabled = !!ms && !ms.some(m => m > now);
 }
 $("#grid").addEventListener("click", e => { const b = e.target.closest(".day.has"); if (b) openDay(b.dataset.date); });
-$("#prev").onclick = () => { cur.setMonth(cur.getMonth() - 1); renderCal(); };
-$("#next").onclick = () => { cur.setMonth(cur.getMonth() + 1); renderCal(); };
+$("#prev").onclick = () => stepMonth(-1);
+$("#next").onclick = () => stepMonth(1);
+
+/* ---------- 일정 검색 ---------- */
+// 검색하면 달력에 걸린 일정만 남긴다. 달 이동·날짜 카드·카드 넘기기도 결과 안에서만.
+let query = "", HITS = null;   // HITS: 걸린 행사ID Set (검색 안 하면 null)
+const dayEvents = date => (byDate[date] || []).filter(e => !HITS || HITS.has(e.id));
+const curYm = () => `${cur.getFullYear()}-${pad(cur.getMonth() + 1)}`;
+const setCur = m => { cur = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1); };
+const hitDates = () => [...new Set(EVENTS.filter(e => HITS.has(e.id)).map(e => e.date))].sort();
+const hitMonths = () => { const c = {}; EVENTS.forEach(e => { if (HITS.has(e.id)) { const m = e.date.slice(0, 7); c[m] = (c[m] || 0) + 1; } }); return c; };
+function stepMonth(dir) {
+  if (!HITS) { cur.setMonth(cur.getMonth() + dir); renderCal(); return; }
+  const ms = Object.keys(hitMonths()).sort(), now = curYm();
+  const m = dir > 0 ? ms.find(x => x > now) : ms.filter(x => x < now).pop();
+  if (m) { setCur(m); renderCal(); renderQres(); }
+}
+// 날짜로 읽히는 검색어: 11/13 · 11.13 · 11월 13일 · 2026.11 · 2026-11-13 · 11월
+function dateToken(t) {
+  let m;
+  if ((m = t.match(/^(\d{4})[.\-/년]\s*(\d{1,2})[.\-/월]?\s*(?:(\d{1,2})일?)?\.?$/))) return d => d.startsWith(`${m[1]}-${pad(m[2])}`) && (!m[3] || d.endsWith(`-${pad(m[3])}`));
+  if ((m = t.match(/^(\d{1,2})[./월]\s*(\d{1,2})일?\.?$/))) return d => d.slice(5) === `${pad(m[1])}-${pad(m[2])}`;
+  if ((m = t.match(/^(\d{1,2})월$/))) return d => d.slice(5, 7) === pad(m[1]);
+  return null;
+}
+const norm = s => String(s || "").toLowerCase().replace(/\s+/g, "");
+let HAY = {};   // 행사ID → 검색용 문자열
+function buildHay() {
+  HAY = {};
+  EVENTS.forEach(e => {
+    const parts = [e.title, e.place, e.desc, TYPES[e.type]?.label];
+    (SOURCES[e.id] || []).forEach(s => parts.push(s.author, s.title, PLATFORM_LABEL[s.platform]));
+    (ITEMS[e.id] || []).forEach(it => parts.push(it.name, it.brand, it.cat, BRAND_ALIAS[(it.brand || "").toLowerCase()]));
+    HAY[e.id] = norm(parts.filter(Boolean).join(" "));
+  });
+}
+function search(q) {
+  const toks = q.trim().split(/\s+/).filter(Boolean);
+  if (!toks.length) return null;
+  // 붙여 쓴 전체 문구도 한 번 맞춰본다 ("솔리드 옴므" → "솔리드옴므")
+  const whole = norm(q);
+  const tests = toks.map(t => { const dt = dateToken(t); return dt ? e => dt(e.date) : e => HAY[e.id].includes(norm(t)); });
+  return new Set(EVENTS.filter(e => tests.every(f => f(e)) || (toks.length > 1 && HAY[e.id].includes(whole))).map(e => e.id));
+}
+function renderQres() {
+  const box = $("#qRes");
+  if (!HITS) { box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  const c = hitMonths(), ms = Object.keys(c).sort(), now = curYm();
+  if (!ms.length) { box.innerHTML = `<p class="qsum">검색 결과가 없어요</p>`; return; }
+  const y = String(TODAY.getFullYear());
+  box.innerHTML = `<p class="qsum">검색 결과 <b>${HITS.size}</b>건${ms.length > 1 ? ` · ${ms.length}개월` : ""}</p>` +
+    `<div class="cats" role="group" aria-label="결과가 있는 달">${ms.map(m => `<button class="bf" data-m="${m}" aria-pressed="${m === now}">${m.slice(0, 4) === y ? `${+m.slice(5)}월` : `${m.slice(2, 4)}.${m.slice(5)}`} <span>${c[m]}</span></button>`).join("")}</div>`;
+  box.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+$("#qRes").addEventListener("click", e => { const b = e.target.closest("button[data-m]"); if (b) { setCur(b.dataset.m); renderCal(); renderQres(); } });
+let qTimer = null, qLogTimer = null;
+function applyQuery(jump = true) {
+  HITS = search(query);
+  $("#qClear").hidden = !query;
+  if (HITS && jump) { const ds = hitDates(); if (ds.length) setCur(ds[0].slice(0, 7)); }
+  renderCal(); renderQres();
+  clearTimeout(qLogTimer);
+  if (HITS && query.trim().length >= 2) qLogTimer = setTimeout(() => track(`검색 · ${query.trim()}`), 1500);
+}
+$("#q").addEventListener("input", () => { query = $("#q").value; clearTimeout(qTimer); qTimer = setTimeout(applyQuery, 200); });
+$("#q").addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeout(qTimer); applyQuery(); $("#q").blur(); } else if (e.key === "Escape") clearQuery(); });
+function clearQuery() { $("#q").value = query = ""; clearTimeout(qTimer); applyQuery(false); }
+$("#qClear").addEventListener("click", () => { clearQuery(); $("#q").focus(); });
 $("#legend").innerHTML = Object.entries(TYPES).map(([k, T]) => `<span>${mark(k)}${T.label}</span>`).join("");
 
 /* ---------- 아이템 목록 ---------- */
@@ -362,7 +433,7 @@ const byDateId = (a, b) => evById[a].date.localeCompare(evById[b].date) || a.loc
 const hasContent = id => !!(SOURCES[id]?.length || ITEMS[id]?.length);   // 볼 게 있는 일정만 상세 카드로
 const contentIds = () => EVENTS.filter(e => hasContent(e.id)).map(e => e.id).sort(byDateId);
 function navList(view) {
-  if (view.v === "day") return Object.keys(byDate).sort();
+  if (view.v === "day") return HITS ? hitDates() : Object.keys(byDate).sort();
   if (view.v === "event") return view.scope || contentIds();
   return view.scope ? view.scope.filter(k => GROUPS[k]) : Object.keys(GROUPS).sort(byLatest);
 }
@@ -397,10 +468,11 @@ function go(dir) {
   const next = view.v === "day" ? { ...view, date: list[j] } : view.v === "event" ? { ...view, id: list[j], random: false } : { ...view, key: list[j] };
   stack[stack.length - 1] = next;
   render(next, dir);
-  if (next.v === "day") { const d = next.date; const m = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, 1); if (m.getTime() !== cur.getTime()) { cur = m; renderCal(); } }
+  if (next.v === "day") { const d = next.date; const m = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, 1); if (m.getTime() !== cur.getTime()) { cur = m; renderCal(); if (HITS) renderQres(); } }
 }
 function openDay(date) { stack = []; push({ v: "day", date }); }
-function openEvent(id) { push({ v: "event", id }); }
+// 검색 중에 날짜 카드에서 연 일정은 검색 결과 안에서만 넘긴다
+function openEvent(id) { push(HITS ? { v: "event", id, scope: contentIds().filter(x => HITS.has(x)) } : { v: "event", id }); }
 /* ---------- 랜덤 일정 ---------- */
 function pickRandom(except) {
   const pool = contentIds().filter(id => id !== except && evById[id].date <= ymd(TODAY));
@@ -434,7 +506,7 @@ const SRC_HINT = { youtube: "영상", instagram: "게시물", x: "게시물", ca
 function renderDay(date) {
   $("#sheetTitle").textContent = fmtDate(date);
   const dd = dday(date);
-  $("#sheetBody").innerHTML = (dd ? `<p class="soon"><b>${dd}</b>${dd === "오늘" ? "오늘 있는 일정이에요" : "예정된 일정이에요"}</p>` : "") + (byDate[date] || []).map(e => {
+  $("#sheetBody").innerHTML = (dd ? `<p class="soon"><b>${dd}</b>${dd === "오늘" ? "오늘 있는 일정이에요" : "예정된 일정이에요"}</p>` : "") + dayEvents(date).map(e => {
     const n = ITEMS[e.id]?.length || 0, srcs = orderSrcs(SOURCES[e.id] || []);
     const title = hasContent(e.id)
       ? `<button data-ev="${esc(e.id)}">${esc(e.title)}<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>`
@@ -511,6 +583,7 @@ $("#homeLink").addEventListener("click", e => {
   e.preventDefault();
   if (stack.length) closeAll();
   $("#tab-cal").click();
+  if (query) clearQuery();
   cur = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1); renderCal();
   scrollTo({ top: 0, behavior: "smooth" });
 });
@@ -609,6 +682,7 @@ document.addEventListener("visibilitychange", () => {
 $("#upnext").addEventListener("click", () => {
   const d = $("#upnext").dataset.date; if (!d) return;
   track(`배너 · ${$("#upnext").classList.contains("past") ? "최근 일정" : "다음 일정"}`);
+  if (query) clearQuery();   // 배너는 검색과 상관없이 그 날짜 전체를 보여준다
   cur = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, 1); renderCal();
   openDay(d);
 });
@@ -638,7 +712,7 @@ async function boot() {
       cur = new Date(+past.slice(0, 4), +past.slice(5, 7) - 1, 1);
     }
     $("#status").textContent = "";
-    buildGroups(); renderCal(); renderList(); renderUpnext();
+    buildGroups(); buildHay(); renderCal(); renderList(); renderUpnext();
   } catch (err) {
     $("#status").textContent = "일정 데이터를 불러오지 못했어요. 잠시 후 새로고침해 주세요.";
   }
