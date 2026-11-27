@@ -166,7 +166,7 @@ function renderQres() {
   if (!ms.length) { box.innerHTML = `<p class="qsum">검색 결과가 없어요</p>`; return; }
   const y = String(TODAY.getFullYear());
   box.innerHTML = `<p class="qsum">검색 결과 <b>${HITS.size}</b>건${ms.length > 1 ? ` · ${ms.length}개월` : ""}</p>` +
-    `<div class="cats" role="group" aria-label="결과가 있는 달">${ms.map(m => `<button class="bf" data-m="${m}" aria-pressed="${m === now}">${m.slice(0, 4) === y ? `${+m.slice(5)}월` : `${m.slice(2, 4)}.${m.slice(5)}`} <span>${c[m]}</span></button>`).join("")}</div>`;
+    `<div class="cats" role="group" aria-label="결과가 있는 달">${ms.map(m => `<button class="bf" data-m="${m}" aria-pressed="${m === now}">${m.slice(0, 4) === y ? `${+m.slice(5)}월` : `${m.slice(2, 4)}.${m.slice(5)}`}<span>· ${c[m]}건</span></button>`).join("")}</div>`;
   box.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 $("#qRes").addEventListener("click", e => { const b = e.target.closest("button[data-m]"); if (b) { setCur(b.dataset.m); renderCal(); renderQres(); } });
