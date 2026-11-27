@@ -311,11 +311,11 @@ main{padding-block:20px 32px}
       <button class="upnext" id="upnext" hidden></button>
       <button class="randbtn" id="randomBtn" aria-label="아무 날 보기: 지난 일정 하나를 랜덤으로 열기">🎲 아무 날 보기</button>
     </div>
-    <div class="qbox" role="search">
+    <form class="qbox" id="qForm" role="search" action="#">
       <svg class="qi" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></svg>
       <input id="q" type="search" placeholder="일정 검색 · 르무통, 칼하트, 침착맨" autocomplete="off" enterkeyhint="search" aria-label="일정 검색">
       <button id="qClear" type="button" aria-label="검색 지우기" hidden><svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
-    </div>
+    </form>
     <div class="qres" id="qRes" hidden></div>
     <div class="cal-head">
       <h2 id="monthLabel"></h2>
@@ -388,6 +388,6 @@ main{padding-block:20px 32px}
     <div class="sheet-body" id="sheetBody"></div>
   </div>
 </div>
-<script src="app.js?v=20261127-s2"></script>
+<script src="app.js?v=20261127-s4"></script>
 </body>
 </html>

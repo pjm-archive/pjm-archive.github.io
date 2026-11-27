@@ -170,18 +170,19 @@ function renderQres() {
   box.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 $("#qRes").addEventListener("click", e => { const b = e.target.closest("button[data-m]"); if (b) { setCur(b.dataset.m); renderCal(); renderQres(); } });
-let qTimer = null, qLogTimer = null;
 function applyQuery(jump = true) {
   HITS = search(query);
-  $("#qClear").hidden = !query;
+  $("#qClear").hidden = !$("#q").value;
   if (HITS && jump) { const ds = hitDates(); if (ds.length) setCur(ds[0].slice(0, 7)); }
   renderCal(); renderQres();
-  clearTimeout(qLogTimer);
-  if (HITS && query.trim().length >= 2) qLogTimer = setTimeout(() => track(`검색 · ${query.trim()}`), 1500);
+  if (HITS) track(`검색 · ${query.trim()}`);
 }
-$("#q").addEventListener("input", () => { query = $("#q").value; clearTimeout(qTimer); qTimer = setTimeout(applyQuery, 200); });
-$("#q").addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeout(qTimer); applyQuery(); $("#q").blur(); } else if (e.key === "Escape") clearQuery(); });
-function clearQuery() { $("#q").value = query = ""; clearTimeout(qTimer); applyQuery(false); }
+// 입력 중에는 찾지 않고, 엔터(키보드의 검색 버튼)를 눌렀을 때만 검색한다. 다 지우면 검색 해제.
+$("#q").addEventListener("input", () => { $("#qClear").hidden = !$("#q").value; if (!$("#q").value && query) clearQuery(); });
+// 폼 제출로 받아야 모바일 키보드의 검색 버튼이 한글 조합 중에도 확실히 먹는다
+$("#qForm").addEventListener("submit", e => { e.preventDefault(); query = $("#q").value; applyQuery(); $("#q").blur(); });
+$("#q").addEventListener("keydown", e => { if (e.key === "Escape") clearQuery(); });
+function clearQuery() { $("#q").value = query = ""; applyQuery(false); }
 $("#qClear").addEventListener("click", () => { clearQuery(); $("#q").focus(); });
 $("#legend").innerHTML = Object.entries(TYPES).map(([k, T]) => `<span>${mark(k)}${T.label}</span>`).join("");
 
